@@ -6,21 +6,10 @@ prerequisite unlocks downstream work.
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
+import pytest
+from support import graph_text, node_block
 
-# `graph/` is a top-level package beside `src/`, but pytest's `pythonpath` is
-# configured for `src` only and `pyproject.toml` is outside this node's
-# ownership. Adding the repository root here keeps the import working; folding
-# `graph` into the project's `pythonpath` is a recommended follow-up.
-_REPO_ROOT = str(Path(__file__).resolve().parents[2])
-if _REPO_ROOT not in sys.path:
-    sys.path.insert(0, _REPO_ROOT)
-
-import pytest  # noqa: E402
-from support import graph_text, node_block  # noqa: E402
-
-from graph import (  # noqa: E402
+from graph import (
     Graph,
     NodeStatus,
     blocked_nodes,

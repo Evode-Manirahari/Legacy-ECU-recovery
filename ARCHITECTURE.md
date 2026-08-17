@@ -88,8 +88,12 @@ the background.
   `newly_ready_if_passed`. All queries are pure.
 - `prompts/*.md` — one contract per node.
 
-There is no `ecu-recovery graph` CLI subcommand: `src/` is outside `GRAPH-001`'s
-ownership. The package is used from Python:
+Inspect it from the CLI or from Python:
+
+```bash
+ecu-recovery graph status   # every node, its status, and why it is not ready
+ecu-recovery graph ready    # only nodes whose dependencies have all passed
+```
 
 ```python
 import graph
@@ -98,6 +102,10 @@ g = graph.load_graph()
 print(graph.render_status_table(g))
 print(graph.ready_nodes(g))
 ```
+
+The subcommand is read-only — inspecting the graph never edits node status. It
+imports `graph` lazily, so an installed copy of `ecu_recovery` still runs with
+no development scaffolding present.
 
 ## Modules that exist
 
@@ -159,7 +167,7 @@ These are stated here because this document must not overstate what exists.
 | `EVAL-STATIC-001` | No harness, no `artifacts/evals/` outputs, no gate-target comparison. |
 | `TOOLS-001` | No agent-facing tool layer with input/output schemas. |
 | `RESEARCH-001` | No `docs/research/ecu-target-matrix.{md,csv}`. |
-| `GRAPH-001` | Implemented. Remaining: no `ecu-recovery graph` CLI subcommand (`src/` is another node's ownership), `graph/` is outside mypy's configured `files`, and `artifacts/` is gitignored so generated baselines are not tracked. |
+| `GRAPH-001` | Implemented, including the CLI subcommand, `graph/` under strict mypy, and a tracked `artifacts/` allowlist. |
 | CI coverage | CI runs on Linux only, so the x86-64 Mach-O fixture tests never execute there. Covering them needs an x86-64 macOS runner or a portable fixture target — a `DATA-001` decision. |
 
 ## Components that do not exist

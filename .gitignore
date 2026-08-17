@@ -7,7 +7,13 @@ dist/
 build/
 *.egg-info/
 *.sqlite3
-artifacts/
+# Local scratch output (databases, ad-hoc reports) is ignored, but recorded
+# evaluation and integration results are tracked: EVALS.md requires a baseline
+# that is never silently replaced, which only works if it is committed.
+artifacts/*
+!artifacts/README.md
+!artifacts/evals/
+!artifacts/integration/
 samples/*.bin
 samples/*.hex
 samples/*.srec
