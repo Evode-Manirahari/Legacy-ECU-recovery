@@ -16,7 +16,8 @@ def render_markdown(store: InvestigationStore, analysis_id: int) -> str:
     lines = [
         f"# Firmware analysis: {analysis['filename']}",
         "",
-        "> Static investigation artifact. Do not treat this report as authorization or guidance to flash hardware.",
+        "> Static investigation artifact. Do not treat this report as authorization "
+        "or guidance to flash hardware.",
         "",
         "## Intake facts",
         "",
@@ -70,4 +71,3 @@ def write_markdown(store: InvestigationStore, analysis_id: int, output: str | Pa
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(render_markdown(store, analysis_id), encoding="utf-8")
     return path
-

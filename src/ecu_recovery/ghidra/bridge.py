@@ -25,7 +25,9 @@ def load_functions(export_path: str | Path) -> list[FunctionRecord]:
     for index, item in enumerate(payload["functions"]):
         try:
             address_value = item["address"]
-            address = int(address_value, 0) if isinstance(address_value, str) else int(address_value)
+            address = (
+                int(address_value, 0) if isinstance(address_value, str) else int(address_value)
+            )
             name = str(item["name"])
             size = None if item.get("size") is None else int(item["size"])
             decompilation = item.get("decompilation")
@@ -35,4 +37,3 @@ def load_functions(export_path: str | Path) -> list[FunctionRecord]:
             raise GhidraExportError(f"invalid function values at index {index}")
         records.append(FunctionRecord(address, name, size, decompilation))
     return records
-

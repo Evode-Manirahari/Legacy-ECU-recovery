@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator
 
 from .models import BinaryProfile, FunctionRecord, Hypothesis
 
@@ -89,9 +89,16 @@ class InvestigationStore:
                     profile_json=excluded.profile_json
                 """,
                 (
-                    profile.sha256, profile.filename, profile.path, profile.size,
-                    profile.sha1, profile.md5, profile.entropy, profile.processor,
-                    profile.byte_order, profile_json,
+                    profile.sha256,
+                    profile.filename,
+                    profile.path,
+                    profile.size,
+                    profile.sha1,
+                    profile.md5,
+                    profile.entropy,
+                    profile.processor,
+                    profile.byte_order,
+                    profile_json,
                 ),
             )
             row = connection.execute(
@@ -110,7 +117,13 @@ class InvestigationStore:
                     name=excluded.name, size=excluded.size,
                     decompilation=excluded.decompilation
                 """,
-                (analysis_id, function.address, function.name, function.size, function.decompilation),
+                (
+                    analysis_id,
+                    function.address,
+                    function.name,
+                    function.size,
+                    function.decompilation,
+                ),
             )
 
     def save_hypothesis(self, analysis_id: int, hypothesis: Hypothesis) -> None:
@@ -123,13 +136,19 @@ class InvestigationStore:
                 VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    analysis_id, hypothesis.subject, hypothesis.claim,
-                    hypothesis.certainty.value, hypothesis.confidence,
-                    json.dumps(hypothesis.evidence), hypothesis.uncertainty,
+                    analysis_id,
+                    hypothesis.subject,
+                    hypothesis.claim,
+                    hypothesis.certainty.value,
+                    hypothesis.confidence,
+                    json.dumps(hypothesis.evidence),
+                    hypothesis.uncertainty,
                 ),
             )
 
-    def report_data(self, analysis_id: int) -> tuple[sqlite3.Row, list[sqlite3.Row], list[sqlite3.Row]]:
+    def report_data(
+        self, analysis_id: int
+    ) -> tuple[sqlite3.Row, list[sqlite3.Row], list[sqlite3.Row]]:
         with self.connect() as connection:
             analysis = connection.execute(
                 "SELECT * FROM analyses WHERE id = ?", (analysis_id,)
@@ -144,4 +163,3 @@ class InvestigationStore:
                 (analysis_id,),
             ).fetchall()
             return analysis, list(functions), list(hypotheses)
-

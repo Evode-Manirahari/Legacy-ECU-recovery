@@ -23,7 +23,9 @@ def _entropy(counts: Counter[int], size: int) -> float:
     return -sum((count / size) * math.log2(count / size) for count in counts.values())
 
 
-def _repeated_regions(data: bytes, block_size: int = 256, limit: int = 32) -> tuple[RepeatedRegion, ...]:
+def _repeated_regions(
+    data: bytes, block_size: int = 256, limit: int = 32
+) -> tuple[RepeatedRegion, ...]:
     """Find exact repeated blocks without quadratic pairwise comparison."""
     first_seen: dict[bytes, int] = {}
     repeats: list[RepeatedRegion] = []
@@ -78,4 +80,3 @@ def profile_binary(
         fill_bytes=fill_bytes,
         repeated_regions=_repeated_regions(data),
     )
-
