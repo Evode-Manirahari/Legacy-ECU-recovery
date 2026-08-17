@@ -77,3 +77,34 @@ The binding scoring rules for the current six fixtures are documented in
 `firmware.stripped` file, freeze its results, and then reveal symbols-on addresses
 and JSON ground truth. Function and call-edge scores use exact address matches;
 behavior uses exact integer equality. Report raw counts with every rate.
+
+## Prompt 3 static-analysis baseline
+
+First recorded measurement. Engine: Ghidra 12.1.2 via PyGhidra 2.2.1, Zulu
+OpenJDK 21, macOS x86-64. Detected language `x86:LE:64:default`. Input:
+`firmware.stripped` only; ground truth read from the symbols-on build afterwards.
+Asserted in `tests/test_analysis_ghidra.py`.
+
+| Metric | Fixture | Result | Counts |
+|---|---|---|---|
+| Function discovery recall | `temperature_controller_v1` | 100% | 3 / 3 |
+| Function discovery precision | `temperature_controller_v1` | 100% | 3 / 3 |
+| Function discovery recall | `multi_function_pipeline_v1` | 100% | 6 / 6 |
+| Call-edge recall | `multi_function_pipeline_v1` | 100% | 5 / 5 |
+| Call-edge precision | `multi_function_pipeline_v1` | 100% | 5 / 5 |
+| Serialization fidelity | both | pass | JSON round trip, no Java objects |
+
+Scope limits on this baseline, stated so the number is not over-read:
+
+- Two of six fixtures are covered. `rpm_calculation_v1`, `lookup_1d_v1`,
+  `lookup_2d_v1`, and `state_machine_v1` are not yet scored.
+- These are unstripped-prologue, compiler-generated x86-64 Mach-O binaries at
+  `-O1` with `-fno-inline` and frame pointers retained. Function boundaries are
+  close to the easiest case a disassembler can be given.
+- Constant and table detection, function classification, evidence validity, and
+  calibration are defined but unmeasured. `search_constant` is exercised for
+  correctness, not scored for precision and recall.
+- No model is involved yet, so none of the investigator metrics apply.
+
+Read this as evidence that the extraction path is wired correctly and matches
+ground truth, not as a prediction about real ECU firmware.

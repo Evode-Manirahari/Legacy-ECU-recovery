@@ -3,22 +3,34 @@
 Items are ordered by the supplied build-prompt sequence. Moving an item between
 sections requires the preceding prompt's acceptance criteria to pass.
 
-## NOW — Prompt 3: deterministic PyGhidra analysis
+## NOW — Prompt 4: bounded, validated agent tools
 
-- Install or discover a compatible Ghidra/PyGhidra environment.
-- Define plain analysis models and an engine-independent adapter interface.
-- Analyze one stripped synthetic fixture without reading its ground truth.
-- Export functions, memory regions, calls, strings, bytes, and constants as JSON.
-- Mark Ghidra integration tests so they skip with a useful reason when absent.
-- Score discovered functions against symbols-on addresses only after results are
-  saved.
+- Wrap the session capabilities as narrowly scoped tools with structured input
+  and output, building on the bounds already in `analysis/base.py`.
+- Give every tool explicit validation and typed failures rather than tracebacks.
+- Write `TOOL_DESIGN.md` recording purpose, input, output, failure cases, and
+  maximum output size for each tool.
+- Cover invalid input and oversized results with tests.
+- Keep the layer free of any model dependency.
 
 ## NEXT
 
-- Prompt 4: introduce bounded, validated Python investigation tools.
 - Prompt 5: expose stable tools through a local, least-privilege MCP server.
 - Prompts 6–9: investigator, persistent evidence memory, evaluation harness,
   and structured engineering report.
+
+## Known gaps carried forward
+
+- Intake rejects extension-free files. Raw ROM dumps frequently have no
+  extension, so the allowlist needs a decision before Prompt 21.
+- Ghidra parses untrusted binaries in our own process. Prompt 16 must decide
+  between accepting this, sandboxing the JVM, or moving to a headless subprocess.
+- `--base-address` sets the image base for a raw dump but is only exercised
+  against Mach-O fixtures that carry their own base. It needs a raw-binary
+  fixture before it can be called verified.
+- Function classification, evidence validity, and confidence calibration from
+  `docs/synthetic-lab.md` are defined but unmeasured; they need Prompt 8's
+  harness.
 
 ## LATER
 
@@ -39,3 +51,8 @@ sections requires the preceding prompt's acceptance criteria to pass.
 - Prompt 2: six reproducible x86-64 Mach-O fixtures, source/ground-truth
   separation, symbols-on and stripped artifacts, behavior probes, metadata,
   exact scoring rules, and 20 laboratory tests.
+- Prompt 3: engine-free analysis models, a bounded `StaticAnalysisEngine` /
+  `StaticAnalysisSession` interface, a PyGhidra implementation of all thirteen
+  capabilities, JSON export, `analyze --ghidra`, stricter Ghidra discovery, and
+  24 Ghidra integration tests that skip with a reason when Ghidra is absent
+  (81 tests total; 57 run without Ghidra).

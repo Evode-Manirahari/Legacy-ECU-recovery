@@ -85,3 +85,77 @@ The investigator receives only `firmware.stripped`. Source, JSON ground truth,
 symbols-on binaries, callable behavior libraries, and build records are evaluator
 assets. Symbols-on and stripped executables originate from the same compiled file
 so expected functions can be matched by exact start address after a blinded run.
+
+## 2026-08-17 — Use PyGhidra in process rather than headless scripts
+
+**Status:** accepted
+
+Ghidra is reached through PyGhidra's JVM bridge instead of shelling out to
+`analyzeHeadless` with an export script. In-process access gives the decompiler,
+reference manager, and listing directly, which the later agent tool layer needs
+for interactive queries; a headless script would force every new capability
+through a batch export round trip.
+
+The cost is that Ghidra parses untrusted binaries inside our process. That is
+acceptable while the only inputs are fixtures this repository compiled, and it
+must be revisited before real firmware arrives. `ecu_recovery.ghidra.bridge`
+remains for importing an analysis produced elsewhere.
+
+## 2026-08-17 — Make a function's entry address its identity
+
+**Status:** accepted
+
+`FunctionRecord.id` is the zero-padded hex entry address. Names do not survive
+stripping and Ghidra's `FUN_*` labels are display artifacts that change when a
+user renames a function, so neither can be an identifier. Entry address is stable
+across renames, matches the ground-truth scoring rule in `docs/synthetic-lab.md`,
+and lets an id be used anywhere an address is accepted.
+
+## 2026-08-17 — Put response bounds on the interface, not in the engine
+
+**Status:** accepted
+
+`MAX_READ_BYTES`, `MAX_INSTRUCTIONS`, `MAX_RESULTS`, and the shared validators
+live in `analysis/base.py`. An agent must never be able to request an unbounded
+response, and a limit that lives inside one engine is a limit the next engine
+silently loses. Prompt 4's tool layer builds on these rather than inventing its
+own.
+
+## 2026-08-17 — Report decompiler failure as data
+
+**Status:** accepted
+
+`decompile_function` returns `DecompilerResult(success=False, warnings=...)`
+instead of raising. Which functions the decompiler cannot handle is itself an
+investigative finding the agent must be able to reason about and cite, and an
+exception would discard it.
+
+## 2026-08-17 — Treat PyGhidra as an optional extra
+
+**Status:** accepted
+
+`pyghidra` installs via `uv sync --extra ghidra`, not as a core dependency. The
+analysis models, interface, bounds, and serialization stay testable on a host
+with no Ghidra and no JVM, which keeps the adapter boundary honest. Ghidra tests
+carry the `ghidra` marker and skip with a stated reason when it is absent.
+
+**Supersedes** the Prompt 1 note that Prompt 3 might make Ghidra mandatory.
+
+## 2026-08-17 — Require an application root for Ghidra discovery
+
+**Status:** accepted
+
+Discovery looks for `Ghidra/application.properties` under `GHIDRA_INSTALL_DIR`,
+`GHIDRA_HOME`, known Homebrew and `/opt` locations, or a directory reachable from
+a launcher on `PATH`. The previous check accepted any executable named
+`ghidraRun`, which could pass while PyGhidra still had nothing to start.
+
+## 2026-08-17 — Widen the intake extension allowlist
+
+**Status:** accepted
+
+The allowlist now covers `.bin`, `.rom`, `.img`, `.hex`, `.s19`, `.srec`, and the
+laboratory's `.stripped` and `.symbols`. The previous three-extension list
+rejected this project's own investigator-visible artifact. The extension check is
+a guard against selecting the wrong file, not a security control; extension-free
+raw dumps are a known gap recorded in `TODO.md`.

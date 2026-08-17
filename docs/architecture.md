@@ -15,13 +15,20 @@ the analysis path.
 ```text
 firmware bytes ──> safe intake ──> immutable profile ──> SQLite
                                          │                 │
-Ghidra (out of process) ──> JSON adapter ─┘                 ├──> report
-                                                           └──> future agent tools
+Ghidra (PyGhidra, in process) ──> plain  ┘                 ├──> report
+                                  records ──> analysis.json└──> future agent tools
 ```
 
 The intake component reads an allow-listed firmware file as bytes. It never
-executes, imports, or shells out through the image. Ghidra runs separately and
-crosses a validated JSON boundary. This keeps model access narrow and auditable.
+executes, imports, or shells out through the image.
+
+Ghidra runs in process through PyGhidra's JVM. The boundary is a type boundary,
+not a process boundary: `analysis/ghidra.py` is the only module that may touch
+Java, and it converts everything to plain records before returning. That keeps
+model access narrow and auditable, but it does mean Ghidra parses untrusted input
+inside our process — see the open risk in [`../THREAT_MODEL.md`](../THREAT_MODEL.md).
+The validated JSON adapter in `ecu_recovery.ghidra.bridge` remains available for
+importing an analysis produced elsewhere.
 
 ## Trust model
 

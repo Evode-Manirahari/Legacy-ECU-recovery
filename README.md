@@ -17,7 +17,9 @@ report. Firmware is treated as data and is never executed by the intake path.
 - SQLite investigation store for functions, evidence, and hypotheses.
 - Markdown engineering report with clear `known`, `inferred`, and `unknown`
   distinctions.
-- A narrow adapter boundary for importing future Ghidra analysis.
+- Ghidra static analysis through PyGhidra behind an engine-independent interface:
+  functions, call graph, disassembly, decompilation, cross-references, strings,
+  memory regions, bounded byte reads, and constant search.
 - Six reproducible synthetic firmware fixtures with isolated ground truth,
   symbols-on/stripped builds, behavior probes, and artifact hashes.
 
@@ -36,6 +38,27 @@ uv run ecu-recovery analyze path/to/firmware.bin \
 uv run pytest
 ```
 
+### Static analysis with Ghidra
+
+```bash
+brew install ghidra            # or set GHIDRA_INSTALL_DIR
+uv sync --extra ghidra
+uv run ecu-recovery analyze \
+  samples/synthetic/binaries/multi_function_pipeline_v1/firmware.stripped \
+  --ghidra --decompile \
+  --analysis-json artifacts/analysis.json
+```
+
+That discovers functions, the call graph, strings, and memory regions, and writes
+the full serialized result to `artifacts/analysis.json`. For a raw dump with no
+load address, add `--language` and `--base-address`.
+
+Ghidra tests run by default and skip with a stated reason when it is missing.
+Skip the slow JVM path with `uv run pytest -m "not ghidra"`.
+
+See [docs/ghidra-integration.md](docs/ghidra-integration.md) for the layering,
+discovery order, response bounds, and what has actually been measured.
+
 `uv.lock` pins the complete development environment. Ruff provides linting and
 formatting, while mypy runs strict static type checks:
 
@@ -45,9 +68,8 @@ uv run ruff format --check .
 uv run mypy
 ```
 
-The doctor command reports missing Ghidra as a warning during initial
-development. Ghidra is not required until the static-analysis integration
-milestone.
+The doctor command reports missing Ghidra or PyGhidra as warnings, so the rest of
+the toolchain stays usable without them.
 
 Rebuild and verify the synthetic laboratory:
 
@@ -71,6 +93,9 @@ src/ecu_recovery/analysis/ deterministic analysis public boundary
 src/ecu_recovery/agent/   reserved agent boundary; no AI integration yet
 src/ecu_recovery/evidence/ evidence model public boundary
 src/ecu_recovery/reports/ reporting public boundary
+src/ecu_recovery/analysis/models.py  engine-free analysis vocabulary
+src/ecu_recovery/analysis/base.py    engine interface, bounds, typed errors
+src/ecu_recovery/analysis/ghidra.py  the only module that touches Java
 docs/               architecture, research decisions, experiments
 samples/synthetic/  known-source firmware laboratory and generated artifacts
 scripts/            reproducible dataset builder
@@ -79,9 +104,9 @@ tests/              automated tests
 
 ## Next milestone
 
-Choose one processor family, compile a small known embedded program for it, and
-export Ghidra's functions/call relationships/decompiler output into the adapter.
-The milestone succeeds when the system explains five important functions and
+Wrap the analysis session in narrowly scoped, validated agent tools with
+documented input, output, failure cases, and output-size limits — still with no
+model attached. After that, the investigator agent explains five functions and
 each explanation cites inspectable evidence.
 
 See [docs/architecture.md](docs/architecture.md) and

@@ -17,6 +17,12 @@ dev = [
   "pytest>=8.4,<9",
   "ruff>=0.12,<1",
 ]
+# Ghidra-backed static analysis. Optional because the deterministic models,
+# adapter interface, and serialization must remain testable on a host that has
+# no Ghidra installation. See docs/ghidra-integration.md.
+ghidra = [
+  "pyghidra>=2.2,<3",
+]
 
 [project.scripts]
 ecu-recovery = "ecu_recovery.cli:main"
@@ -28,6 +34,11 @@ packages = ["src/ecu_recovery"]
 addopts = "-q"
 testpaths = ["tests"]
 pythonpath = ["src"]
+# Ghidra tests run by default and skip themselves with a reason when Ghidra or
+# PyGhidra is missing. Opt out of the slow JVM path with `-m "not ghidra"`.
+markers = [
+  "ghidra: requires a local Ghidra installation and PyGhidra",
+]
 
 [tool.ruff]
 line-length = 100
@@ -46,3 +57,10 @@ strict = true
 files = ["src", "tests"]
 pretty = true
 show_error_codes = true
+
+# Ghidra's API is Java reached through JPype, and PyGhidra ships no type
+# information. These are untyped by nature, so the boundary that touches them
+# (analysis/ghidra.py) is responsible for converting to typed plain records.
+[[tool.mypy.overrides]]
+module = ["pyghidra.*", "ghidra.*", "jpype.*", "java.*"]
+ignore_missing_imports = true
