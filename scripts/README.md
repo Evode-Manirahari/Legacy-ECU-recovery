@@ -1,4 +1,5 @@
 # Development scripts
 
-Prompt 1 uses standard Python project commands directly. Repetitive project-
-specific automation may be added here only when a real workflow requires it.
+`build_synthetic.py` rebuilds every Prompt 2 fixture, runs embedded self-tests,
+verifies expected symbols are present only in the symbols-on build, and records
+artifact hashes plus the compiler invocation.

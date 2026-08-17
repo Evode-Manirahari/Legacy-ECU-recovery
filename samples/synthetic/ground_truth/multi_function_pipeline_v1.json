@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "sample_id": "multi_function_pipeline_v1",
+  "title": "Multi-function sensor-control pipeline",
+  "source": "source/multi_function_pipeline.c",
+  "probe_parameters": ["raw_value", "offset", "gain_percent"],
+  "expected_functions": [
+    "apply_gain",
+    "clamp_output",
+    "control_output",
+    "main",
+    "normalize_sensor",
+    "sample_probe"
+  ],
+  "expected_function_roles": {
+    "apply_gain": "Scales a signed value by an integer percentage.",
+    "clamp_output": "Clamps a signed control value to the inclusive range zero through one thousand.",
+    "control_output": "Runs normalization, gain, and clamping as a multi-function control pipeline.",
+    "main": "Runs embedded behavior self-tests and returns zero only when all pass.",
+    "normalize_sensor": "Subtracts a calibration offset from a raw sensor value.",
+    "sample_probe": "Passes all three probe inputs to the control pipeline."
+  },
+  "classification_functions": [
+    "apply_gain",
+    "clamp_output",
+    "control_output",
+    "normalize_sensor"
+  ],
+  "expected_call_edges": [
+    {"caller": "main", "callee": "sample_probe"},
+    {"caller": "sample_probe", "callee": "control_output"},
+    {"caller": "control_output", "callee": "normalize_sensor"},
+    {"caller": "control_output", "callee": "apply_gain"},
+    {"caller": "control_output", "callee": "clamp_output"}
+  ],
+  "expected_constants": [0, 100, 1000],
+  "expected_behavior": [
+    {
+      "inputs": {"raw_value": 500, "offset": 100, "gain_percent": 125},
+      "output": 500
+    },
+    {
+      "inputs": {"raw_value": 50, "offset": 100, "gain_percent": 200},
+      "output": 0
+    },
+    {
+      "inputs": {"raw_value": 1000, "offset": 0, "gain_percent": 200},
+      "output": 1000
+    }
+  ]
+}

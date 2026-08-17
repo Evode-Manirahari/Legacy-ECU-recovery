@@ -1,0 +1,62 @@
+{
+  "architecture": "x86_64-apple-darwin",
+  "artifacts": {
+    "behavior.dylib": "ca60bbc4f251793ab6cc0375e18bfc6361e3f23eb9bf4f1aa3e9f7a360ded07f",
+    "firmware.stripped": "6d9629d3c197284d2b30c11d8731171375a05c7da949c41298e70245b32733fe",
+    "firmware.symbols": "76c6978f43889cb4f6c2c7ba37bd5399e4e8a43e917655e64be0f543aec4fcc3"
+  },
+  "commands": {
+    "behavior_library": [
+      "/usr/bin/clang",
+      "-std=c11",
+      "-arch",
+      "x86_64",
+      "-mmacosx-version-min=13.0",
+      "-O1",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-fno-inline",
+      "-fno-omit-frame-pointer",
+      "-fno-stack-protector",
+      "-DSAMPLE_BEHAVIOR_LIBRARY",
+      "-dynamiclib",
+      "-fvisibility=hidden",
+      "${PROJECT_ROOT}/samples/synthetic/source/temperature_controller.c",
+      "-Wl,-install_name,@rpath/behavior.dylib",
+      "-Wl,-no_uuid",
+      "-o",
+      "${PROJECT_ROOT}/samples/synthetic/binaries/temperature_controller_v1/behavior.dylib"
+    ],
+    "strip": [
+      "/usr/bin/strip",
+      "-S",
+      "-x",
+      "firmware.stripped"
+    ],
+    "symbols_on": [
+      "/usr/bin/clang",
+      "-std=c11",
+      "-arch",
+      "x86_64",
+      "-mmacosx-version-min=13.0",
+      "-O1",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-fno-inline",
+      "-fno-omit-frame-pointer",
+      "-fno-stack-protector",
+      "-fno-pie",
+      "${PROJECT_ROOT}/samples/synthetic/source/temperature_controller.c",
+      "-Wl,-no_pie",
+      "-Wl,-no_uuid",
+      "-o",
+      "${PROJECT_ROOT}/samples/synthetic/binaries/temperature_controller_v1/firmware.symbols"
+    ]
+  },
+  "compiler": "Apple clang version 16.0.0 (clang-1600.0.26.6)",
+  "sample_id": "temperature_controller_v1",
+  "schema_version": 1,
+  "source_sha256": "537c18e6e844384cb5303a724ada146db402dbe65742d08c7a17aa0da5e1efd1"
+}

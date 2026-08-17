@@ -1,92 +1,118 @@
-# Legacy ECU Recovery Agent
+# Legacy ECU Recovery
 
 ## Problem
 
-Legacy embedded controllers can remain useful long after their source code,
-build system, symbols, hardware documentation, and original engineering team
-have disappeared. An engineer may possess an authorized firmware image but
-still spend days manually determining its processor, memory layout, functions,
-data tables, and behavior.
+Legacy embedded software routinely outlives its source repository, compiler
+toolchain, design documents, debugging symbols, test suites, hardware
+documentation, and original engineering team. The controller itself often still
+matters — in vehicles, industrial equipment, and discontinued products.
 
-This project investigates whether a tool-using AI agent can shorten that work
-while keeping every conclusion traceable to deterministic evidence.
+An engineer may hold an authorized firmware image, partial manuals, and old
+diagnostics, and still spend days determining the processor, memory layout,
+function inventory, calibration data, and behavior by hand.
 
-## Intended user
+## Target user
 
-The initial user is a skilled reverse engineer or embedded-systems engineer at
-an ECU repair, remanufacturing, restoration, research, or legacy-product support
-organization. The system supports that engineer; it does not replace their
-judgment or certify recovered software.
+The first user is a skilled engineer who already performs this work: an embedded
+reverse engineer, ECU remanufacturer, automotive electronics repair specialist,
+engineering consultant, or supplier maintaining a discontinued product.
 
-## Initial scope
+The system augments that engineer. It does not replace engineering judgment and
+it does not certify recovered software.
 
-The first milestone is deliberately narrow:
+## Initial value proposition
 
-> Given one known embedded binary on one supported architecture, automatically
-> analyze it using Ghidra and correctly explain several important functions.
+Reduce the repetitive part of legacy firmware investigation — structural
+analysis, cross-referencing, hypothesis generation, experimentation, and
+documentation — while keeping every conclusion traceable to inspectable evidence.
 
-Development begins with synthetic programs whose source and behavior are known.
-The analysis side will not receive their ground-truth source. Architecture
-selection is explicit until automated detection can be evaluated honestly.
+Value exists before perfect source reconstruction does.
+
+## Initial technical goal
+
+> Take a stripped embedded binary whose source is hidden from the analysis
+> system and recover useful structural information through deterministic static
+> analysis, measured against hidden ground truth.
+
+Deterministic retrieval must be reliable and measured **before** any AI agent is
+introduced. Until static analysis is measurable, an error cannot be attributed
+among Ghidra, the parser, the tool layer, the context, the model, and the prompt.
+
+## Central principle
+
+The system does not optimize for confident answers. It optimizes for testable
+claims:
+
+```text
+OBSERVE → HYPOTHESIZE → TEST → COLLECT EVIDENCE → UPDATE BELIEF → VERIFY
+```
+
+Every conclusion distinguishes `KNOWN`, `INFERRED`, and `UNKNOWN`.
 
 ## Non-goals
 
-The initial project will not implement:
+This project does not implement:
 
-- firmware flashing or modification of real ECUs;
-- immobilizer, security-access, or key extraction bypasses;
-- remote exploitation or vehicle-network attacks;
-- CAN injection or live vehicle control;
+- firmware flashing or modification of any real ECU;
+- live vehicle control or vehicle-network attacks, including CAN injection;
+- immobilizer bypass, security-access bypass, or credential/key extraction;
+- arbitrary host execution on behalf of a model;
+- analysis of firmware without documented authorization;
+- support for every processor architecture;
+- whole-firmware source reconstruction or "perfect" C recovery;
 - safety-critical deployment or certification;
-- support for every ECU or processor architecture;
-- whole-firmware source reconstruction;
-- analysis of firmware without clear authorization.
+- a frontend, a complete ECU emulator, or enterprise infrastructure at this stage.
+
+Analysis is not certification. Research, reconstruction, and deployment stay
+separate.
+
+## Development method
+
+Work is organized as a directed acyclic **development graph** of bounded nodes,
+not as one long autonomous coding loop. An edge means *the prerequisite has been
+verified*, not *an agent reported done*.
+
+Three graphs are kept distinct and must not be conflated:
+
+| Graph | Purpose | Status |
+|---|---|---|
+| A — Development graph | Build the product | active |
+| B — Firmware investigation graph | How the finished system investigates | not started |
+| C — Firmware knowledge graph | Accumulated understanding of one firmware | not started |
+
+Verification prefers, in order: deterministic checks, ground-truth comparison,
+human expert judgment, and only then an LLM judge. If software can prove a
+property, an LLM is not asked whether it looks correct.
 
 ## Milestones
 
-1. **Engineering foundation:** reproducible Python project, diagnostic CLI,
-   tests, linting, formatting, type checking, and environment documentation.
-2. **Synthetic firmware laboratory:** known-source samples, reproducible builds,
-   isolated ground truth, and machine-readable expectations.
-3. **Deterministic static analysis:** one architecture through PyGhidra, mapped
-   into provider-neutral Python records and serialized results.
-4. **Bounded investigation tools:** narrow, validated, paginated queries over
-   static-analysis results.
-5. **Evidence-backed investigator:** one-function hypotheses with confidence,
-   alternatives, uncertainties, and citations to tool results.
-6. **Evaluation and reporting:** ground-truth scoring, regression fixtures, and
-   an engineering report that separates known, inferred, and unknown claims.
-7. **Controlled emulation:** synthetic binaries only, followed by approved,
-   bounded experiments and one-function behavioral reconstruction.
-8. **Real-firmware readiness:** a safety, legal, dataset, and architecture review
-   before any authorized historical ECU image is introduced.
+Phase boundaries are gates. A gate is a verification node, not a feeling.
 
-## Proposed repository structure
+1. **Static MVP** — `SPEC-001` → `REPO-001` → {`DATA-001`, `RESEARCH-001`,
+   `EVIDENCE-001`} → `GHIDRA-001` → `EVAL-STATIC-001` → `TOOLS-001` →
+   `INTEGRATION-STATIC-001` → `GATE-STATIC-MVP`.
+2. **Investigator agent** — only after `GATE-STATIC-MVP`.
+3. **Emulation** — only after `GATE-AGENT-MVP`.
+4. **Experimentation** — controlled, validated, human-approved.
+5. **Reconstruction** — one function, verified behaviorally.
+6. **Real authorized ECU firmware** — only after every prior gate, a security
+   review, documented authorization, and human approval.
 
-The structure will evolve incrementally. Prompt 1 should converge toward:
+## Commercial question
 
-```text
-Legacy-ECU-recovery/
-├── README.md
-├── pyproject.toml
-├── PROJECT.md
-├── ARCHITECTURE.md
-├── DECISIONS.md
-├── TODO.md
-├── EVALS.md
-├── THREAT_MODEL.md
-├── RESEARCH_NOTES.md
-├── docs/
-├── samples/
-│   └── synthetic/
-├── scripts/
-├── src/
-│   └── ecu_recovery/
-│       ├── binary/
-│       ├── analysis/
-│       ├── agent/
-│       ├── evidence/
-│       └── reports/
-└── tests/
-```
+The metric that matters is not tokens, tool calls, or hypothesis count. It is:
 
+> How much expensive expert engineering time does the system save while
+> maintaining trust?
+
+The aspirational early target is a 50% reduction in investigation time for a
+bounded firmware-analysis task. That must not be claimed until measured with a
+real specialist on an authorized problem.
+
+## Authoritative specification
+
+`docs/MASTER_SPEC.md` is the authoritative engineering specification. Where any
+other document conflicts with it, the master specification wins.
+
+> **Blocker (2026-08-17):** `docs/MASTER_SPEC.md` is not present in this
+> repository. See `TODO.md` → NOW.

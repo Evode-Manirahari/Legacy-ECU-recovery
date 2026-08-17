@@ -26,6 +26,20 @@ Only analyze:
 
 Record provenance and authorization alongside every non-synthetic sample.
 
+## Mandatory boundaries
+
+These are required by `docs/MASTER_SPEC.md` and are not negotiable by any node.
+
+| Boundary | Meaning |
+|---|---|
+| Authorized firmware only | Every non-synthetic sample carries recorded provenance and authorization. |
+| No live vehicle control | The system never actuates a vehicle or any physical control. |
+| No firmware flashing | The system never writes firmware to a device. |
+| No immobilizer or security-access bypass | Not implemented, not researched as a capability. |
+| No credential or key extraction | Not implemented as a feature or a tool. |
+| No arbitrary host execution | A model never gets shell, arbitrary Python, unrestricted filesystem, or network. |
+| Sandbox generated code | Any C the system generates is compiled and run under isolation, never trusted on the host. |
+
 ## Prohibited capabilities
 
 Do not implement:
@@ -36,10 +50,15 @@ Do not implement:
 - remote exploitation;
 - live vehicle control;
 - vehicle-network attacks or CAN injection;
-- modification or deployment of a real safety-critical ECU.
+- modification or deployment of a real safety-critical ECU;
+- destructive ECU operations.
 
 No current or future “analysis” command may silently expand into one of these
 capabilities.
+
+Generated-code sandboxing is a **future** control: no code generation exists yet,
+and the isolation it requires is not built. It is listed here because the boundary
+must be defined before the reconstruction phase, not after.
 
 ## Principal threats and controls
 
@@ -56,12 +75,41 @@ capabilities.
 
 ## Current posture
 
-The implemented intake reads `.bin`, `.img`, and `.rom` files up to 64 MiB and
-does not execute them. The optional Ghidra path only imports an existing JSON
-file; Ghidra itself is not yet launched. There is no model, MCP server, emulator,
-network access, vehicle interface, or firmware-writing capability.
+Intake reads an allowlisted extension up to 64 MiB and never executes the file.
+The allowlist is `.bin`, `.rom`, `.img`, `.hex`, `.s19`, `.srec`, `.stripped`,
+and `.symbols`. Treat it as a guard against selecting the wrong file, not as a
+security control: an extension says nothing about content. The controls that
+carry weight are the regular-file check, the size cap, and the fact that intake
+only reads bytes.
+
+There is no model, MCP server, emulator, network access, vehicle interface, or
+firmware-writing capability.
+
+### Open risk: Ghidra parses untrusted input in our process
+
+`--ghidra` starts a JVM inside the `ecu-recovery` process and
+hands the binary to Ghidra's loaders, analyzers, and decompiler. A malicious
+firmware image that exploits a Ghidra parser would be executing in our process,
+with our filesystem access and no memory, CPU, or time limit.
+
+This is currently accepted because every analyzed input is a fixture this
+repository compiled from source it owns. It stops being acceptable the moment a
+third-party image is analyzed.
+
+Partial mitigations in place today:
+
+- each session opens in a throwaway project directory that is deleted on close,
+  so Ghidra's writable state never lands in the repository;
+- responses are bounded by `MAX_READ_BYTES`, `MAX_INSTRUCTIONS`, and
+  `MAX_RESULTS`, so no caller can pull an unbounded result;
+- Ghidra's Java objects cannot escape `analysis/ghidra.py`.
+
+Not in place: process isolation, memory limits, CPU limits, wall-clock limits,
+and a network-disabled sandbox. The security review that gates the real-firmware
+phase must treat this as a blocker, and no node may introduce third-party firmware
+until it is closed.
 
 Passing tests does not establish that the system is secure. Isolation controls
-must be actively tested before execution or third-party parsers become part of
-the supported workflow.
+must be actively tested before untrusted third-party firmware enters the
+workflow.
 

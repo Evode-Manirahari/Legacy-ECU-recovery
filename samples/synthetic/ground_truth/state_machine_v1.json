@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "sample_id": "state_machine_v1",
+  "title": "Simplified engine-state machine",
+  "source": "source/state_machine.c",
+  "probe_parameters": ["current_state", "rpm", "fault"],
+  "expected_functions": ["main", "next_state", "sample_probe"],
+  "expected_function_roles": {
+    "main": "Runs embedded behavior self-tests and returns zero only when all pass.",
+    "next_state": "Transitions among off, cranking, running, and fault states using RPM and fault input.",
+    "sample_probe": "Passes the probe inputs to the state transition function."
+  },
+  "classification_functions": ["next_state"],
+  "expected_call_edges": [
+    {"caller": "main", "callee": "sample_probe"},
+    {"caller": "sample_probe", "callee": "next_state"}
+  ],
+  "expected_constants": [0, 1, 2, 3, 600],
+  "expected_behavior": [
+    {"inputs": {"current_state": 0, "rpm": 0, "fault": 0}, "output": 0},
+    {"inputs": {"current_state": 0, "rpm": 100, "fault": 0}, "output": 1},
+    {"inputs": {"current_state": 1, "rpm": 700, "fault": 0}, "output": 2},
+    {"inputs": {"current_state": 2, "rpm": 0, "fault": 0}, "output": 0},
+    {"inputs": {"current_state": 2, "rpm": 700, "fault": 1}, "output": 3}
+  ]
+}

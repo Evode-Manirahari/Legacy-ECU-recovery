@@ -1,0 +1,62 @@
+{
+  "architecture": "x86_64-apple-darwin",
+  "artifacts": {
+    "behavior.dylib": "74074553442f7bb0a930df11a48850201060e7085bcf7969ac62ac315c4c2bf4",
+    "firmware.stripped": "5c7b009d3626f55e27804a479fbf4b95ab41840a2cf2d46b99276fdb8bf31a76",
+    "firmware.symbols": "4f8f2838900543f4a763043aa9e84bc8e7fdd6fdc8b3af7715e73fb2f5c72d0d"
+  },
+  "commands": {
+    "behavior_library": [
+      "/usr/bin/clang",
+      "-std=c11",
+      "-arch",
+      "x86_64",
+      "-mmacosx-version-min=13.0",
+      "-O1",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-fno-inline",
+      "-fno-omit-frame-pointer",
+      "-fno-stack-protector",
+      "-DSAMPLE_BEHAVIOR_LIBRARY",
+      "-dynamiclib",
+      "-fvisibility=hidden",
+      "${PROJECT_ROOT}/samples/synthetic/source/lookup_1d.c",
+      "-Wl,-install_name,@rpath/behavior.dylib",
+      "-Wl,-no_uuid",
+      "-o",
+      "${PROJECT_ROOT}/samples/synthetic/binaries/lookup_1d_v1/behavior.dylib"
+    ],
+    "strip": [
+      "/usr/bin/strip",
+      "-S",
+      "-x",
+      "firmware.stripped"
+    ],
+    "symbols_on": [
+      "/usr/bin/clang",
+      "-std=c11",
+      "-arch",
+      "x86_64",
+      "-mmacosx-version-min=13.0",
+      "-O1",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-fno-inline",
+      "-fno-omit-frame-pointer",
+      "-fno-stack-protector",
+      "-fno-pie",
+      "${PROJECT_ROOT}/samples/synthetic/source/lookup_1d.c",
+      "-Wl,-no_pie",
+      "-Wl,-no_uuid",
+      "-o",
+      "${PROJECT_ROOT}/samples/synthetic/binaries/lookup_1d_v1/firmware.symbols"
+    ]
+  },
+  "compiler": "Apple clang version 16.0.0 (clang-1600.0.26.6)",
+  "sample_id": "lookup_1d_v1",
+  "schema_version": 1,
+  "source_sha256": "a367995c5ac683017cd7ad333fdfa9bc2337f373801019dc18e075c98f9268c1"
+}

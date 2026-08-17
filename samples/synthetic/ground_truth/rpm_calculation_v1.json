@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "sample_id": "rpm_calculation_v1",
+  "title": "Simplified RPM calculation",
+  "source": "source/rpm_calculation.c",
+  "probe_parameters": ["ticks_per_second", "pulses_per_revolution", "period_ticks"],
+  "expected_functions": ["main", "rpm_from_period", "sample_probe"],
+  "expected_function_roles": {
+    "main": "Runs embedded behavior self-tests and returns zero only when all pass.",
+    "rpm_from_period": "Converts pulse period into integer revolutions per minute and rejects invalid divisors.",
+    "sample_probe": "Passes the three probe inputs to the RPM calculation."
+  },
+  "classification_functions": ["rpm_from_period"],
+  "expected_call_edges": [
+    {"caller": "main", "callee": "sample_probe"},
+    {"caller": "sample_probe", "callee": "rpm_from_period"}
+  ],
+  "expected_constants": [0, 60],
+  "expected_behavior": [
+    {
+      "inputs": {
+        "ticks_per_second": 1000000,
+        "pulses_per_revolution": 2,
+        "period_ticks": 5000
+      },
+      "output": 6000
+    },
+    {
+      "inputs": {
+        "ticks_per_second": 1000000,
+        "pulses_per_revolution": 2,
+        "period_ticks": 10000
+      },
+      "output": 3000
+    },
+    {
+      "inputs": {
+        "ticks_per_second": 1000000,
+        "pulses_per_revolution": 0,
+        "period_ticks": 10000
+      },
+      "output": 0
+    }
+  ]
+}

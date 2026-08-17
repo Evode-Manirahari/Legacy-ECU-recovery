@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from ecu_recovery.analysis import ghidra as ghidra_discovery
 from ecu_recovery.cli import main
 from ecu_recovery.doctor import CheckStatus, render_doctor_report, run_doctor
 
@@ -34,12 +35,29 @@ ecu-recovery = "ecu_recovery.cli:main"
         (root / directory).mkdir(parents=True)
 
 
+def _fake_ghidra_install(root: Path, version: str = "12.1.2") -> Path:
+    """Build the minimum layout PyGhidra needs to recognize an install."""
+    application = root / "Ghidra"
+    application.mkdir(parents=True)
+    (application / "application.properties").write_text(
+        f"application.name=Ghidra\napplication.version={version}\n", encoding="utf-8"
+    )
+    return root
+
+
+def _isolate_from_host_ghidra(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Hide any real Ghidra so the missing-install path is what gets tested."""
+    monkeypatch.delenv("GHIDRA_INSTALL_DIR", raising=False)
+    monkeypatch.delenv("GHIDRA_HOME", raising=False)
+    monkeypatch.setattr(ghidra_discovery, "_INSTALL_HINTS", ())
+    monkeypatch.setenv("PATH", os.pathsep.join(filter(None, [str(Path(os.__file__).parent)])))
+
+
 def test_doctor_succeeds_when_optional_ghidra_is_missing(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _project_fixture(tmp_path)
-    monkeypatch.delenv("GHIDRA_HOME", raising=False)
-    monkeypatch.setenv("PATH", os.pathsep.join(filter(None, [str(Path(os.__file__).parent)])))
+    _isolate_from_host_ghidra(monkeypatch)
 
     report = run_doctor(tmp_path)
 
@@ -51,20 +69,36 @@ def test_doctor_succeeds_when_optional_ghidra_is_missing(
     assert "Ghidra" in render_doctor_report(report)
 
 
-def test_doctor_discovers_ghidra_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_doctor_discovers_ghidra_install_dir(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     _project_fixture(tmp_path)
-    ghidra_home = tmp_path / "ghidra"
-    launcher = ghidra_home / "ghidraRun"
-    launcher.parent.mkdir()
-    launcher.write_text("#!/bin/sh\n", encoding="utf-8")
-    launcher.chmod(0o755)
-    monkeypatch.setenv("GHIDRA_HOME", str(ghidra_home))
+    _isolate_from_host_ghidra(monkeypatch)
+    install = _fake_ghidra_install(tmp_path / "ghidra")
+    monkeypatch.setenv("GHIDRA_INSTALL_DIR", str(install))
 
     report = run_doctor(tmp_path)
 
     ghidra = next(check for check in report.checks if check.name == "Ghidra")
     assert ghidra.status is CheckStatus.PASS
-    assert str(launcher) in ghidra.message
+    assert str(install.resolve()) in ghidra.message
+    assert "12.1.2" in ghidra.message
+
+
+def test_doctor_ignores_a_launcher_without_an_application_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A `ghidraRun` shim alone is not a usable install; PyGhidra needs the root."""
+    _project_fixture(tmp_path)
+    _isolate_from_host_ghidra(monkeypatch)
+    bare = tmp_path / "bare"
+    bare.mkdir()
+    monkeypatch.setenv("GHIDRA_INSTALL_DIR", str(bare))
+
+    report = run_doctor(tmp_path)
+
+    ghidra = next(check for check in report.checks if check.name == "Ghidra")
+    assert ghidra.status is CheckStatus.WARN
 
 
 def test_doctor_reports_missing_directories(tmp_path: Path) -> None:

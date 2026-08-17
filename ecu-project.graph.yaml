@@ -1,0 +1,224 @@
+# Legacy ECU Recovery - development graph (Graph A).
+#
+# Authority: docs/MASTER_SPEC.md. This file encodes the REQUIRED GRAPH from
+# Appendix A, plus the dependencies stated in sections 24-26.
+#
+# A status of PASSED is the only thing that unlocks a dependent node. An edge
+# means the prerequisite was verified, not that an agent reported done.
+#
+# UNVERIFIED-UNDER-GRAPH marks pre-graph code that exists but was never checked
+# against its node contract. Those nodes still have to be executed; section 50
+# step 8 forbids grandfathering them in.
+#
+# Two dependency statements in the specification disagree with Appendix A. Both
+# readings are encoded, which is the conservative choice: a union of edges can
+# never unlock a node earlier than either reading allows. See the notes below.
+
+project:
+  id: legacy-ecu-recovery
+  version: "1.1"
+  spec: docs/MASTER_SPEC.md
+
+nodes:
+
+  SPEC-001:
+    title: Engineering foundation and project contract
+    depends_on: []
+    status: PASSED
+    worker: coding-agent
+    prompt: prompts/SPEC-001.md
+    allowed_paths:
+      - PROJECT.md
+      - ARCHITECTURE.md
+      - DECISIONS.md
+      - TODO.md
+      - EVALS.md
+      - THREAT_MODEL.md
+      - RESEARCH.md
+    verification:
+      type: human
+    retry_budget: 1
+
+  REPO-001:
+    title: Reproducible Python engineering infrastructure
+    depends_on:
+      - SPEC-001
+    status: PASSED
+    worker: coding-agent
+    prompt: prompts/REPO-001.md
+    allowed_paths:
+      - pyproject.toml
+      - src/ecu_recovery/**
+      - tests/**
+      - .github/workflows/**
+    verification:
+      type: commands
+      commands:
+        - uv run pytest
+        - uv run ruff check .
+        - uv run ruff format --check .
+        - uv run mypy
+    retry_budget: 2
+
+  GRAPH-001:
+    title: Development graph infrastructure
+    depends_on:
+      - REPO-001
+    status: VERIFYING
+    worker: coding-agent
+    prompt: prompts/GRAPH-001.md
+    allowed_paths:
+      - ecu-project.graph.yaml
+      - graph/**
+      - prompts/**
+      - artifacts/**
+      - tests/graph/**
+      - TODO.md
+      - ARCHITECTURE.md
+    verification:
+      type: commands
+      commands:
+        - uv run pytest
+        - uv run ruff check .
+        - uv run ruff format --check .
+        - uv run mypy
+    retry_budget: 2
+
+  DATA-001:
+    title: Synthetic firmware laboratory
+    depends_on:
+      - GRAPH-001
+    status: UNVERIFIED-UNDER-GRAPH
+    worker: coding-agent
+    prompt: prompts/DATA-001.md
+    allowed_paths:
+      - samples/**
+      - scripts/**
+      - tests/**
+      - docs/synthetic-lab.md
+    verification:
+      type: commands
+      commands:
+        - uv run pytest
+    retry_budget: 2
+    note: Six of eight required fixture categories exist from pre-graph work.
+
+  RESEARCH-001:
+    title: First ECU architecture research
+    depends_on:
+      - GRAPH-001
+    status: PENDING
+    worker: research-agent
+    prompt: prompts/RESEARCH-001.md
+    allowed_paths:
+      - docs/research/**
+    verification:
+      type: human
+    retry_budget: 2
+    note: Recommends candidates only. Target selection is a human gate.
+
+  EVIDENCE-001:
+    title: Epistemic evidence data model
+    depends_on:
+      - GRAPH-001
+    status: UNVERIFIED-UNDER-GRAPH
+    worker: coding-agent
+    prompt: prompts/EVIDENCE-001.md
+    allowed_paths:
+      - src/ecu_recovery/evidence/**
+      - tests/evidence/**
+    verification:
+      type: commands
+      commands:
+        - uv run pytest
+    retry_budget: 2
+    note: Missing Evidence and Relationship entities, status model, and history.
+
+  GHIDRA-001:
+    title: Deterministic PyGhidra static analysis
+    # Appendix A requires DATA-001. Section 24 also lists REPO-001, which is
+    # transitively satisfied but recorded explicitly for traceability.
+    depends_on:
+      - DATA-001
+      - REPO-001
+    status: UNVERIFIED-UNDER-GRAPH
+    worker: coding-agent
+    prompt: prompts/GHIDRA-001.md
+    allowed_paths:
+      - src/ecu_recovery/analysis/**
+      - tests/analysis/**
+    verification:
+      type: commands
+      commands:
+        - uv run pytest
+    retry_budget: 2
+    note: Adapter exists from pre-graph work but exposes no analysis-warnings field.
+
+  EVAL-STATIC-001:
+    title: Hidden-ground-truth static evaluation
+    # Appendix A requires GHIDRA-001. Section 25 also lists DATA-001.
+    depends_on:
+      - GHIDRA-001
+      - DATA-001
+    status: PENDING
+    worker: coding-agent
+    prompt: prompts/EVAL-STATIC-001.md
+    allowed_paths:
+      - src/ecu_recovery/evaluation/**
+      - artifacts/evals/**
+      - tests/evaluation/**
+    verification:
+      type: commands
+      commands:
+        - uv run pytest
+    retry_budget: 2
+
+  TOOLS-001:
+    title: Bounded agent-facing analysis tools
+    # Appendix A requires EVAL-STATIC-001. Section 26 states GHIDRA-001. Both
+    # are encoded; GHIDRA-001 is already transitive through EVAL-STATIC-001.
+    depends_on:
+      - EVAL-STATIC-001
+      - GHIDRA-001
+    status: PENDING
+    worker: coding-agent
+    prompt: prompts/TOOLS-001.md
+    allowed_paths:
+      - src/ecu_recovery/tools/**
+      - tests/tools/**
+      - TOOL_DESIGN.md
+    verification:
+      type: commands
+      commands:
+        - uv run pytest
+    retry_budget: 2
+
+  INTEGRATION-STATIC-001:
+    title: Static MVP integration
+    depends_on:
+      - TOOLS-001
+      - EVIDENCE-001
+    status: PENDING
+    worker: coding-agent
+    prompt: prompts/INTEGRATION-STATIC-001.md
+    allowed_paths:
+      - artifacts/integration/**
+      - tests/integration/**
+    verification:
+      type: commands
+      commands:
+        - uv run pytest
+    retry_budget: 2
+
+  GATE-STATIC-MVP:
+    title: Static MVP gate
+    depends_on:
+      - INTEGRATION-STATIC-001
+    status: PENDING
+    worker: verification
+    prompt: prompts/GATE-STATIC-MVP.md
+    allowed_paths: []
+    verification:
+      type: gate
+    retry_budget: 0
+    note: Blocks all investigator-agent work until it passes.

@@ -1,0 +1,61 @@
+name: CI
+
+# Runs the repository's own acceptance checks. Ghidra is deliberately NOT
+# installed here: REPO-001 requires that a missing Ghidra never causes the
+# repository itself to fail, so CI is the standing proof of that property.
+# The Ghidra-marked tests skip with a stated reason, and the x86-64 Mach-O
+# fixture tests skip on Linux through their own platform guards.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Tests, lint, format, types
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.11.17"
+          enable-cache: true
+
+      - name: Install Python
+        run: uv python install 3.11
+
+      - name: Sync the locked development environment
+        # --frozen fails if uv.lock does not match pyproject.toml, so a
+        # dependency change cannot land without an updated lockfile.
+        run: uv sync --extra dev --frozen
+
+      - name: Tests
+        run: uv run --no-sync pytest
+
+      - name: Lint
+        run: uv run --no-sync ruff check .
+
+      - name: Format
+        run: uv run --no-sync ruff format --check .
+
+      - name: Types
+        run: uv run --no-sync mypy
+
+      - name: Environment report
+        # Not an assertion, just recorded output: shows what CI detected.
+        if: always()
+        run: uv run --no-sync ecu-recovery doctor

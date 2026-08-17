@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "dataset_id": "legacy_ecu_synthetic_v1",
+  "architecture": {
+    "isa": "x86_64",
+    "bits": 64,
+    "endianness": "little",
+    "object_format": "Mach-O",
+    "abi": "Darwin",
+    "ghidra_language": "x86:LE:64:default"
+  },
+  "investigator_visible": [
+    "binaries/<sample_id>/firmware.stripped"
+  ],
+  "samples": [
+    "temperature_controller_v1",
+    "rpm_calculation_v1",
+    "lookup_1d_v1",
+    "lookup_2d_v1",
+    "state_machine_v1",
+    "multi_function_pipeline_v1"
+  ]
+}

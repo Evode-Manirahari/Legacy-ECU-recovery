@@ -17,7 +17,11 @@ report. Firmware is treated as data and is never executed by the intake path.
 - SQLite investigation store for functions, evidence, and hypotheses.
 - Markdown engineering report with clear `known`, `inferred`, and `unknown`
   distinctions.
-- A narrow adapter boundary for importing future Ghidra analysis.
+- Ghidra static analysis through PyGhidra behind an engine-independent interface:
+  functions, call graph, disassembly, decompilation, cross-references, strings,
+  memory regions, bounded byte reads, and constant search.
+- Six reproducible synthetic firmware fixtures with isolated ground truth,
+  symbols-on/stripped builds, behavior probes, and artifact hashes.
 
 ## Quick start
 
@@ -34,6 +38,27 @@ uv run ecu-recovery analyze path/to/firmware.bin \
 uv run pytest
 ```
 
+### Static analysis with Ghidra
+
+```bash
+brew install ghidra            # or set GHIDRA_INSTALL_DIR
+uv sync --extra ghidra
+uv run ecu-recovery analyze \
+  samples/synthetic/binaries/multi_function_pipeline_v1/firmware.stripped \
+  --ghidra --decompile \
+  --analysis-json artifacts/analysis.json
+```
+
+That discovers functions, the call graph, strings, and memory regions, and writes
+the full serialized result to `artifacts/analysis.json`. For a raw dump with no
+load address, add `--language` and `--base-address`.
+
+Ghidra tests run by default and skip with a stated reason when it is missing.
+Skip the slow JVM path with `uv run pytest -m "not ghidra"`.
+
+See [docs/ghidra-integration.md](docs/ghidra-integration.md) for the layering,
+discovery order, response bounds, and what has actually been measured.
+
 `uv.lock` pins the complete development environment. Ruff provides linting and
 formatting, while mypy runs strict static type checks:
 
@@ -43,9 +68,18 @@ uv run ruff format --check .
 uv run mypy
 ```
 
-The doctor command reports missing Ghidra as a warning during initial
-development. Ghidra is not required until the static-analysis integration
-milestone.
+The doctor command reports missing Ghidra or PyGhidra as warnings, so the rest of
+the toolchain stays usable without them.
+
+Rebuild and verify the synthetic laboratory:
+
+```bash
+uv run python scripts/build_synthetic.py
+uv run pytest tests/test_synthetic_lab.py
+```
+
+See [docs/synthetic-lab.md](docs/synthetic-lab.md) for the visibility boundary,
+architecture rationale, metadata contract, and exact evaluation formulas.
 
 Only analyze firmware you are authorized to possess and inspect. Do not use a
 generated conclusion as a basis for flashing a vehicle or controlling hardware.
@@ -59,18 +93,30 @@ src/ecu_recovery/analysis/ deterministic analysis public boundary
 src/ecu_recovery/agent/   reserved agent boundary; no AI integration yet
 src/ecu_recovery/evidence/ evidence model public boundary
 src/ecu_recovery/reports/ reporting public boundary
+src/ecu_recovery/analysis/models.py  engine-free analysis vocabulary
+src/ecu_recovery/analysis/base.py    engine interface, bounds, typed errors
+src/ecu_recovery/analysis/ghidra.py  the only module that touches Java
 docs/               architecture, research decisions, experiments
-samples/synthetic/  Prompt 2 laboratory placeholder
-scripts/            project automation placeholder
+samples/synthetic/  known-source firmware laboratory and generated artifacts
+scripts/            reproducible dataset builder
 tests/              automated tests
 ```
 
-## Next milestone
+## How this project is built
 
-Choose one processor family, compile a small known embedded program for it, and
-export Ghidra's functions/call relationships/decompiler output into the adapter.
-The milestone succeeds when the system explains five important functions and
-each explanation cites inspectable evidence.
+Development follows the dependency graph in `docs/MASTER_SPEC.md`, which is the
+authoritative engineering specification. Work is executed one bounded node at a
+time, and an edge means the prerequisite was *verified* — not that an agent
+reported done.
 
-See [docs/architecture.md](docs/architecture.md) and
-[docs/experiments.md](docs/experiments.md) for the execution plan.
+The current frontier, open decisions, and node status live in
+[TODO.md](TODO.md). What actually exists is in
+[ARCHITECTURE.md](ARCHITECTURE.md); how correctness is measured is in
+[EVALS.md](EVALS.md).
+
+No AI agent is introduced before the static MVP gate passes, because until
+deterministic retrieval is measurable an error cannot be attributed among Ghidra,
+the parser, the tool layer, the context, the model, and the prompt.
+
+See also [docs/architecture.md](docs/architecture.md) and
+[docs/experiments.md](docs/experiments.md).

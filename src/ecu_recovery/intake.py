@@ -10,7 +10,22 @@ from pathlib import Path
 from .models import BinaryProfile, RepeatedRegion
 
 MAX_FIRMWARE_BYTES = 64 * 1024 * 1024
-SUPPORTED_SUFFIXES = {".bin", ".rom", ".img"}
+
+#: Raw dump and container extensions, plus the two artifact names the synthetic
+#: laboratory produces. This is a usability guard against selecting the wrong
+#: file by mistake, not a security control: an extension proves nothing about
+#: content. The controls that matter are the regular-file check, the size cap,
+#: and the rule that firmware is only ever read as bytes.
+SUPPORTED_SUFFIXES = {
+    ".bin",
+    ".rom",
+    ".img",
+    ".hex",
+    ".s19",
+    ".srec",
+    ".stripped",
+    ".symbols",
+}
 
 
 class IntakeError(ValueError):

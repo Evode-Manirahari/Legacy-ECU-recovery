@@ -1,8 +1,56 @@
 # Evaluation Contract
 
+Correctness is measured against **controlled ground-truth binaries** whose source
+this repository compiled and hides from the analysis system. “The output looks
+good” is not an acceptance criterion.
+
 The project is successful only when it produces repeatable, evidence-backed
-results against ground truth and saves expert time. “The output looks good” is
-not an acceptance criterion.
+results against ground truth and saves expert time.
+
+## Verification hierarchy
+
+Use the highest level that can decide the property.
+
+| Level | Method | Use for |
+|---|---|---|
+| 1 | Deterministic | test result, compiler result, schema validation, binary/call-graph/behavior comparison |
+| 2 | Ground-truth comparison | hidden fixture data |
+| 3 | Human expert | semantic engineering judgment |
+| 4 | LLM judge | only when none of the above can reasonably evaluate it |
+
+> If software can prove it, do not ask another model whether it looks correct.
+
+## `EVAL-STATIC-001` gate targets
+
+Starting thresholds for controlled synthetic fixtures — not immutable truths:
+
+| Metric | Target |
+|---|---|
+| Binary import success | 100% |
+| Serialization success | 100% |
+| Function discovery recall | ≥ 95% |
+| Function discovery precision | ≥ 95% |
+| Call-edge recall | ≥ 90% |
+| Unexpected crashes | 0 |
+
+If observed baseline makes a threshold unrealistic, **do not quietly lower it**.
+Record the observed baseline, the cause, the proposed new threshold, and the
+human approval.
+
+## Agent-phase targets
+
+Applied only after `GATE-STATIC-MVP`:
+
+| Metric | Target |
+|---|---|
+| Evidence references valid | 100% |
+| Schema compliance | 100% |
+| Unsupported factual claims | ≤ 5% |
+| Tool hallucinations | 0 |
+| Critical unsupported claims | 0 |
+
+Semantic classification accuracy is baselined first and only then set as a formal
+gate. Do not invent a flattering threshold before seeing performance.
 
 ## Evaluation dataset
 
@@ -70,3 +118,46 @@ Record the first complete run before prompt optimization. Store tool versions,
 configuration, inputs, outputs, duration, failures, and scorer version. Never
 silently replace a failed result.
 
+## Synthetic dataset v1 protocol
+
+The binding scoring rules for the current six fixtures are documented in
+[`docs/synthetic-lab.md`](docs/synthetic-lab.md). Any static-analysis run must
+analyze only each `firmware.stripped` file, freeze its results, and only then
+reveal symbols-on addresses and JSON ground truth. Function and call-edge scores use exact address matches;
+behavior uses exact integer equality. Report raw counts with every rate.
+
+## Pre-graph static-analysis measurement
+
+**This is not `EVAL-STATIC-001`.** No evaluation harness exists, no
+`artifacts/evals/` outputs exist, and no comparison against the gate targets
+above has been run. These numbers come from assertions inside
+`tests/test_analysis_ghidra.py`, recorded under the deprecated linear sequence.
+They are evidence that the extraction path is wired correctly — not a gate result.
+
+Engine: Ghidra 12.1.2 via PyGhidra 2.2.1, Zulu OpenJDK 21, macOS x86-64. Detected
+language `x86:LE:64:default`. Input: `firmware.stripped` only; ground truth read
+from the symbols-on build afterwards.
+
+| Metric | Fixture | Result | Counts |
+|---|---|---|---|
+| Function discovery recall | `temperature_controller_v1` | 100% | 3 / 3 |
+| Function discovery precision | `temperature_controller_v1` | 100% | 3 / 3 |
+| Function discovery recall | `multi_function_pipeline_v1` | 100% | 6 / 6 |
+| Call-edge recall | `multi_function_pipeline_v1` | 100% | 5 / 5 |
+| Call-edge precision | `multi_function_pipeline_v1` | 100% | 5 / 5 |
+| Serialization fidelity | both | pass | JSON round trip, no Java objects |
+
+Scope limits on this baseline, stated so the number is not over-read:
+
+- Two of six fixtures are covered. `rpm_calculation_v1`, `lookup_1d_v1`,
+  `lookup_2d_v1`, and `state_machine_v1` are not yet scored.
+- These are unstripped-prologue, compiler-generated x86-64 Mach-O binaries at
+  `-O1` with `-fno-inline` and frame pointers retained. Function boundaries are
+  close to the easiest case a disassembler can be given.
+- Constant and table detection, function classification, evidence validity, and
+  calibration are defined but unmeasured. `search_constant` is exercised for
+  correctness, not scored for precision and recall.
+- No model is involved yet, so none of the investigator metrics apply.
+
+Read this as evidence that the extraction path is wired correctly and matches
+ground truth, not as a prediction about real ECU firmware.

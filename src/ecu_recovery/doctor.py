@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import shutil
 import subprocess
 import sys
@@ -122,32 +121,33 @@ def _check_java() -> DoctorCheck:
     return DoctorCheck("Java", CheckStatus.PASS, f"{version} ({executable})")
 
 
-def _ghidra_candidates() -> list[Path]:
-    candidates: list[Path] = []
-    ghidra_home = os.environ.get("GHIDRA_HOME")
-    if ghidra_home:
-        home = Path(ghidra_home).expanduser()
-        candidates.extend((home / "ghidraRun", home / "support" / "analyzeHeadless"))
-    for name in ("ghidraRun", "analyzeHeadless"):
-        executable = shutil.which(name)
-        if executable:
-            candidates.append(Path(executable))
-    return candidates
-
-
 def _check_ghidra() -> DoctorCheck:
-    candidates = _ghidra_candidates()
-    discovered = next(
-        (path.resolve() for path in candidates if path.is_file() and os.access(path, os.X_OK)),
-        None,
-    )
+    from .analysis.ghidra import find_ghidra_install_dir, read_ghidra_version
+
+    discovered = find_ghidra_install_dir()
     if discovered is None:
         return DoctorCheck(
             "Ghidra",
             CheckStatus.WARN,
-            "not found (optional for Prompt 1); set GHIDRA_HOME or add it to PATH",
+            "not found; set GHIDRA_INSTALL_DIR or install Ghidra to enable static analysis",
         )
-    return DoctorCheck("Ghidra", CheckStatus.PASS, f"discovered at {discovered}")
+    return DoctorCheck(
+        "Ghidra", CheckStatus.PASS, f"{read_ghidra_version(discovered)} ({discovered})"
+    )
+
+
+def _check_pyghidra() -> DoctorCheck:
+    """PyGhidra is the bridge; Ghidra alone is not enough to run analysis."""
+    try:
+        import pyghidra
+    except ImportError:
+        return DoctorCheck(
+            "PyGhidra",
+            CheckStatus.WARN,
+            "not installed; run `uv sync --extra ghidra` to enable static analysis",
+        )
+    version = getattr(pyghidra, "__version__", None) or "version unavailable"
+    return DoctorCheck("PyGhidra", CheckStatus.PASS, str(version))
 
 
 def run_doctor(project_root: Path | None = None) -> DoctorReport:
@@ -160,6 +160,7 @@ def run_doctor(project_root: Path | None = None) -> DoctorReport:
             _check_configuration(root),
             _check_java(),
             _check_ghidra(),
+            _check_pyghidra(),
         ),
     )
 
