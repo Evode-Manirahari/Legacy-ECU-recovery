@@ -58,4 +58,3 @@ class Hypothesis:
             raise ValueError("confidence must be between 0.0 and 1.0")
         if self.certainty is Certainty.KNOWN and self.confidence < 1.0:
             raise ValueError("known claims must have confidence 1.0")
-

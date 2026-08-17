@@ -21,18 +21,31 @@ report. Firmware is treated as data and is never executed by the intake path.
 
 ## Quick start
 
-Python 3.11 or newer is required.
+Python 3.11 or newer is required. The checked-in `.python-version` selects 3.11
+for tools that support it.
 
 ```bash
-python -m venv .venv
-. .venv/bin/activate
-pip install -e '.[dev]'
-ecu-recovery analyze path/to/firmware.bin \
+uv sync --extra dev
+uv run ecu-recovery doctor
+uv run ecu-recovery analyze path/to/firmware.bin \
   --processor ST10F269 \
   --database artifacts/investigations.sqlite3 \
   --report artifacts/report.md
-pytest
+uv run pytest
 ```
+
+`uv.lock` pins the complete development environment. Ruff provides linting and
+formatting, while mypy runs strict static type checks:
+
+```bash
+uv run ruff check .
+uv run ruff format --check .
+uv run mypy
+```
+
+The doctor command reports missing Ghidra as a warning during initial
+development. Ghidra is not required until the static-analysis integration
+milestone.
 
 Only analyze firmware you are authorized to possess and inspect. Do not use a
 generated conclusion as a basis for flashing a vehicle or controlling hardware.
@@ -41,9 +54,14 @@ generated conclusion as a basis for flashing a vehicle or controlling hardware.
 
 ```text
 src/ecu_recovery/   core library and CLI
-src/ecu_recovery/ghidra/  Ghidra integration boundary
+src/ecu_recovery/binary/  firmware intake public boundary
+src/ecu_recovery/analysis/ deterministic analysis public boundary
+src/ecu_recovery/agent/   reserved agent boundary; no AI integration yet
+src/ecu_recovery/evidence/ evidence model public boundary
+src/ecu_recovery/reports/ reporting public boundary
 docs/               architecture, research decisions, experiments
-samples/            local samples (firmware files are git-ignored)
+samples/synthetic/  Prompt 2 laboratory placeholder
+scripts/            project automation placeholder
 tests/              automated tests
 ```
 
@@ -56,4 +74,3 @@ each explanation cites inspectable evidence.
 
 See [docs/architecture.md](docs/architecture.md) and
 [docs/experiments.md](docs/experiments.md) for the execution plan.
-

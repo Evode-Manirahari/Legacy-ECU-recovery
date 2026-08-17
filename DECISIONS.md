@@ -50,3 +50,19 @@ providers remain replaceable.
 SQLite is sufficient for a local, single-investigator prototype and requires no
 service. Revisit only after concurrency or scale creates a measured limitation.
 
+## 2026-08-17 — Lock the Python environment with uv
+
+**Status:** accepted
+
+The repository uses standard `pyproject.toml` metadata and commits `uv.lock` for
+repeatable local and automated installations. Ruff owns linting and formatting;
+mypy runs in strict mode; pytest runs the test suite. Runtime code remains free
+of third-party dependencies in Prompt 1.
+
+## 2026-08-17 — Treat Ghidra and Java as optional during scaffolding
+
+**Status:** accepted
+
+The doctor command detects both dependencies but returns success with a clear
+warning when either is unavailable. Prompt 3 may strengthen these checks after
+Ghidra becomes an implemented execution path.

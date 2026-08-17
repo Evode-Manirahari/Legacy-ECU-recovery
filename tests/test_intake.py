@@ -1,11 +1,12 @@
 import hashlib
+from pathlib import Path
 
 import pytest
 
 from ecu_recovery.intake import IntakeError, profile_binary
 
 
-def test_profiles_binary_without_execution(tmp_path):
+def test_profiles_binary_without_execution(tmp_path: Path) -> None:
     firmware = tmp_path / "fixture.bin"
     data = bytes(range(256)) * 2 + b"\xff" * 256
     firmware.write_bytes(data)
@@ -21,7 +22,7 @@ def test_profiles_binary_without_execution(tmp_path):
     assert profile.repeated_regions[0].second_offset == 256
 
 
-def test_rejects_unknown_format(tmp_path):
+def test_rejects_unknown_format(tmp_path: Path) -> None:
     firmware = tmp_path / "fixture.exe"
     firmware.write_bytes(b"not executable by this project")
 
@@ -29,10 +30,9 @@ def test_rejects_unknown_format(tmp_path):
         profile_binary(firmware)
 
 
-def test_rejects_empty_image(tmp_path):
+def test_rejects_empty_image(tmp_path: Path) -> None:
     firmware = tmp_path / "fixture.bin"
     firmware.write_bytes(b"")
 
     with pytest.raises(IntakeError, match="empty"):
         profile_binary(firmware)
-

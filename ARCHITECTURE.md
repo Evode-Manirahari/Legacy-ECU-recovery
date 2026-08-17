@@ -9,11 +9,15 @@ The project is a Python 3.11+ package using a `src/` layout. It has no runtime
 third-party dependencies. The `ecu-recovery` console entry point and
 `python -m ecu_recovery` both route to the same `argparse` CLI.
 
-The only implemented command is:
+The implemented commands are:
 
 ```text
+ecu-recovery doctor
 ecu-recovery analyze <firmware>
 ```
+
+The development environment is resolved by uv and pinned in `uv.lock`. Pytest,
+Ruff, and mypy are development-only dependencies.
 
 ## Current data flow
 
@@ -49,13 +53,20 @@ deterministic byte-only intake ──────┐
 - `ecu_recovery.report` renders the stored investigation as Markdown.
 - `ecu_recovery.cli` connects intake, optional JSON import, storage, and report
   generation.
+- `ecu_recovery.doctor` checks the active Python version, required repository
+  directories, `pyproject.toml`, Java, and optional Ghidra discovery. Missing
+  Ghidra or Java is a warning at this stage; malformed project configuration or
+  missing required directories is a failure.
+- `binary`, `analysis`, `agent`, `evidence`, and `reports` provide stable package
+  boundaries for later prompts. The first four public boundaries re-export only
+  implemented domain behavior. The agent package is intentionally empty.
 
 ## Components that do not exist
 
-There is currently no doctor command, synthetic firmware laboratory, PyGhidra
-integration, complete static-analysis interface, agent tool layer, MCP server,
-AI model integration, autonomous loop, emulator, peripheral model, experiment
-engine, reconstruction pipeline, or graphical interface.
+There is currently no synthetic firmware program, PyGhidra integration,
+complete static-analysis interface, agent tool layer, MCP server, AI model
+integration, autonomous loop, emulator, peripheral model, experiment engine,
+reconstruction pipeline, or graphical interface.
 
 ## Boundaries
 
@@ -63,4 +74,3 @@ Firmware remains local and is read as untrusted data. The current CLI accepts
 only `.bin`, `.img`, and `.rom` files up to 64 MiB. Any future Ghidra process must
 remain outside the core domain layer and return plain structured records. Model
 providers must remain replaceable and must receive only bounded analysis data.
-

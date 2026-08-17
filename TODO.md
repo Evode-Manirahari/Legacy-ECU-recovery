@@ -3,22 +3,18 @@
 Items are ordered by the supplied build-prompt sequence. Moving an item between
 sections requires the preceding prompt's acceptance criteria to pass.
 
-## NOW — Prompt 1: engineering scaffold
+## NOW — Prompt 2: synthetic firmware laboratory
 
-- Reconcile the current package layout with the required `binary`, `analysis`,
-  `agent`, `evidence`, and `reports` package boundaries without breaking the
-  existing CLI.
-- Configure a reproducible development environment.
-- Configure pytest, linting, formatting, and static type checking.
-- Add `ecu-recovery doctor`.
-- Have doctor check Python, required directories, configuration, Java, and
-  optional Ghidra discovery without failing solely because Ghidra is absent.
-- Test the doctor command and local installation path.
-- Update current-state architecture documentation after implementation.
+- Select and document one architecture based on compiler, Ghidra, documentation,
+  and future-emulator availability.
+- Build six known-source embedded C programs with reproducible compiler settings.
+- Preserve symbols-on and symbols-stripped builds separately.
+- Store machine-readable ground truth away from investigator-visible artifacts.
+- Validate every binary-to-metadata relationship with tests.
+- Define exact reverse-engineering accuracy scoring against the fixtures.
 
 ## NEXT
 
-- Prompt 2: build the six-program synthetic firmware laboratory and metadata.
 - Prompt 3: add deterministic PyGhidra analysis for the chosen architecture.
 - Prompt 4: introduce bounded, validated Python investigation tools.
 - Prompt 5: expose stable tools through a local, least-privilege MCP server.
@@ -36,3 +32,8 @@ sections requires the preceding prompt's acceptance criteria to pass.
 - Automatic architecture detection, broader architecture support, and any
   deployment-oriented capability require separate evidence and authorization.
 
+## COMPLETED
+
+- Prompt 0: persistent engineering contract, evaluation plan, and threat model.
+- Prompt 1: Python package boundaries, uv lockfile, pytest, Ruff, strict mypy,
+  minimal CLI, environment doctor, and unit tests.
