@@ -6,15 +6,16 @@ here.
 
 ## Status note (2026-08-17)
 
-The code in this repository was built under a **deprecated linear prompt
-sequence**, before `docs/MASTER_SPEC.md` became the authoritative specification.
-The code is present and its own tests pass, but it has **not** been verified
-against the master specification's node contracts.
+Much of this code was built under a **deprecated linear prompt sequence**,
+before `docs/MASTER_SPEC.md` became the authoritative specification. It is
+present and its own tests pass, but most of it has **not** been verified against
+a node contract.
 
 Under the graph rule — *an edge means the prerequisite has been verified* —
-existing work is recorded as `UNVERIFIED-UNDER-GRAPH`, not `PASSED`. Assigning
-node status retroactively is a human decision and is listed as a blocker in
-`TODO.md`.
+that work is recorded as `UNVERIFIED-UNDER-GRAPH`, not `PASSED`, and it must be
+re-verified in its own node rather than grandfathered in. `SPEC-001` and
+`REPO-001` have since been executed and passed against their contracts; the
+authoritative per-node status is `ecu-project.graph.yaml`.
 
 ## Runtime that exists
 
@@ -62,6 +63,40 @@ tests skip through their own platform guards.
                  │
                  ▼
           Markdown report
+```
+
+## Development-graph infrastructure
+
+`graph/` is engineering scaffolding for *building* the product, not part of the
+product. It is Graph A from the specification — the development graph — and it
+neither launches agents, creates worktrees, schedules work, nor runs anything in
+the background.
+
+- `ecu-project.graph.yaml` — the eleven-node DAG, its dependencies, ownership,
+  verification, and retry budgets. Authoritative over the tables in `TODO.md`.
+- `graph/models.py` — `NodeStatus`, `Verification`, `Node`, `Graph`. Shape only.
+- `graph/state.py` — what each status *means*: only `PASSED` satisfies a
+  dependency, `UNVERIFIED-UNDER-GRAPH` is still executable, and `FAILED`,
+  `BLOCKED`, and `NEEDS_HUMAN` obstruct everything downstream.
+- `graph/loader.py` — reads the graph file. Parses a strict YAML subset rather
+  than adding a dependency, since the repository has no mandatory third-party
+  runtime dependency and `pyproject.toml` belongs to another node. Unsupported
+  syntax raises instead of being guessed at.
+- `graph/validator.py` — rejects cycles, duplicate ids, unknown dependencies,
+  invalid statuses, and self-dependencies, reporting every problem at once.
+- `graph/status.py` — the READY frontier, obstruction analysis, and
+  `newly_ready_if_passed`. All queries are pure.
+- `prompts/*.md` — one contract per node.
+
+There is no `ecu-recovery graph` CLI subcommand: `src/` is outside `GRAPH-001`'s
+ownership. The package is used from Python:
+
+```python
+import graph
+
+g = graph.load_graph()
+print(graph.render_status_table(g))
+print(graph.ready_nodes(g))
 ```
 
 ## Modules that exist
@@ -124,7 +159,7 @@ These are stated here because this document must not overstate what exists.
 | `EVAL-STATIC-001` | No harness, no `artifacts/evals/` outputs, no gate-target comparison. |
 | `TOOLS-001` | No agent-facing tool layer with input/output schemas. |
 | `RESEARCH-001` | No `docs/research/ecu-target-matrix.{md,csv}`. |
-| `GRAPH-001` | No `ecu-project.graph.yaml`, `graph/`, `prompts/`, or `artifacts/`. Owned by this node; nothing else may create them. |
+| `GRAPH-001` | Implemented. Remaining: no `ecu-recovery graph` CLI subcommand (`src/` is another node's ownership), `graph/` is outside mypy's configured `files`, and `artifacts/` is gitignored so generated baselines are not tracked. |
 | CI coverage | CI runs on Linux only, so the x86-64 Mach-O fixture tests never execute there. Covering them needs an x86-64 macOS runner or a portable fixture target — a `DATA-001` decision. |
 
 ## Components that do not exist

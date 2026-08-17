@@ -8,11 +8,19 @@ node moves only when its verification conditions pass.
 `UNVERIFIED-UNDER-GRAPH` means code exists from the deprecated linear sequence
 but was never evaluated against this node's contract. See `ADR-002`.
 
+The graph itself is now machine-readable in `ecu-project.graph.yaml`. This table
+is the human-readable view of it; the file is authoritative.
+
+```bash
+uv run python -c "import graph; print(graph.render_status_table(graph.load_graph()))"
+uv run python -c "import graph; print(graph.render_ready(graph.load_graph()))"
+```
+
 | Node | Status | Note |
 |---|---|---|
 | `SPEC-001` | PASSED | human-approved 2026-08-17 |
-| `REPO-001` | VERIFYING | this change: CI added, rest audited |
-| `GRAPH-001` | PENDING | depends on `REPO-001`; owns graph infrastructure |
+| `REPO-001` | PASSED | audited against contract; CI added |
+| `GRAPH-001` | VERIFYING | this change: graph infrastructure |
 | `DATA-001` | UNVERIFIED-UNDER-GRAPH | 6 of 8 fixture categories exist |
 | `RESEARCH-001` | PENDING | no target matrix exists |
 | `EVIDENCE-001` | UNVERIFIED-UNDER-GRAPH | no Relationship/Evidence entity, no history |
@@ -36,21 +44,21 @@ SPEC-001 → REPO-001 → GRAPH-001 → { DATA-001, RESEARCH-001, EVIDENCE-001 }
 ```
 
 `GRAPH-001` owns `ecu-project.graph.yaml`, `graph/**`, `prompts/**`, and
-`artifacts/**`. Nothing else may create them.
+`artifacts/**`. Nothing else may create them. Each node's contract is in
+`prompts/<NODE-ID>.md`.
 
 ## NOW
 
-- **Open blocker: `docs/MASTER_SPEC.md` is still absent.** Every foundation
-  document cites it as authoritative. It must be added by a human rather than
-  reconstructed from a conversation, so that what nodes cite is what was
-  actually written.
+- Review `GRAPH-001` and mark it `PASSED` if its acceptance conditions hold.
+  Nothing is `READY` until then: the fan-out is waiting on it.
 
 ## NEXT
 
-In dependency order:
+Once `GRAPH-001` passes, `DATA-001`, `RESEARCH-001`, and `EVIDENCE-001` become
+`READY` together — verified by `newly_ready_if_passed`, not by assertion. Their
+file ownership is disjoint, so up to three isolated worktrees may run them in
+parallel.
 
-- `GRAPH-001` — minimum infrastructure to represent, inspect, and later execute
-  the development graph. Executable only after `REPO-001` passes.
 - `DATA-001` — add the two missing fixture categories: integer/bit-mask
   manipulation and timer-like counter logic.
 - `RESEARCH-001` — produce `docs/research/ecu-target-matrix.{md,csv}`. Recommend
