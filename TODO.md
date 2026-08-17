@@ -92,6 +92,64 @@ Gated, in order. Do not begin a phase before its gate passes.
 - **Real authorized ECU firmware**: only after every prior gate, a security
   review, documented authorization, and human approval.
 
+## Candidate nodes (not in the graph)
+
+Ideas under consideration. They are deliberately **absent from
+`ecu-project.graph.yaml`**: the graph is the authority for what work may start,
+and listing an unassigned idea there would imply it is scheduled. A candidate
+becomes a node only when a human assigns it.
+
+### `SYMBOLIC-001` — symbolic behavioral analysis
+
+Derive behavioral evidence from a function mechanically, before any LLM
+interpretation and without paying for full emulation. For a discovered
+function, attempt to establish which inputs affect behavior, what paths exist,
+which constraints select each path, what outputs and memory change, and which
+inputs are observably equivalent.
+
+Proposed position — an **optional branch**, never a mandatory dependency:
+
+```text
+GATE-STATIC-MVP
+      │
+      ├──────────────┐
+      ▼              ▼
+AGENT-001      SYMBOLIC-001
+      │              │
+      └──────┬───────┘
+             ▼
+       EVIDENCE-JOIN
+             ↓
+       GATE-ANALYSIS
+```
+
+Key constraints if it is ever assigned:
+
+- Results are **evidence, not semantic truth**. A recovered partition is a
+  deterministic fact; "this classifies an input into three operating ranges" is
+  an inference, and the two must not be merged.
+- Failure is a legitimate structured result. Peripherals, interrupts, global
+  state, timing, unsupported instructions, path explosion, and environment
+  dependencies all make functions unsuitable; return an
+  unsupported/inconclusive result and let the investigation continue by other
+  means. Do not force it to succeed.
+- Engine behind an internal interface, as with Ghidra. `angr` is the first
+  candidate; nothing outside the adapter may depend on it.
+- Evaluated against synthetic fixtures with hidden ground truth before any real
+  firmware, measuring completion rate, path coverage, condition accuracy,
+  output-effect accuracy, equivalence-class precision and recall, timeout rate,
+  solver-failure rate, and path-explosion rate.
+- It does not replace emulation. Symbolic analysis suits behavior derivable
+  from the function itself; emulation remains necessary where behavior depends
+  on the runtime environment.
+
+The underlying principle is the one already driving the graph: cheap
+deterministic evidence first, AI to interpret it, experiments to challenge the
+interpretation, verification to settle it. Do not ask a model to rediscover
+what a solver can establish.
+
+Nothing has been installed, implemented, or added to the architecture.
+
 ## Carried technical gaps
 
 Recorded so they are not lost between nodes. Each belongs to a node above.

@@ -43,6 +43,50 @@ above as second-hand until they are.
 
 ---
 
+## 2026-08-17 — Symbolic execution as a deterministic evidence source
+
+**Source:** project orchestrator, proposing a candidate `SYMBOLIC-001` node.
+Candidate engine: `angr` (https://angr.io).
+
+**Claim:** A symbolic executor can mechanically recover a function's input
+partitions, path constraints, and observable effects — for example that
+`temp < 80 → 0`, `80 ≤ temp < 100 → 1`, `temp ≥ 100 → 2` — from a stripped
+binary, without executing it and without asking a model to infer it.
+
+**Why it matters:** It sits in the gap between static structure and full
+emulation. Static analysis says a function exists and what it references;
+emulation says what it does but needs a modelled environment, which the
+specification already identifies as the hardest engineering problem. Symbolic
+analysis could supply behavioral evidence for the subset of functions that are
+self-contained, at far lower cost, and it produces facts a solver can defend
+rather than prose a model produced.
+
+It also strengthens an existing rule: do not ask an LLM to rediscover what
+deterministic analysis can establish. Every partition a solver recovers is one
+fewer claim resting on interpretation.
+
+**Decision affected:** None yet. Recorded in `TODO.md` under candidate nodes,
+deliberately kept out of `ecu-project.graph.yaml` so it cannot be mistaken for
+scheduled work. It would attach after `GATE-STATIC-MVP` as an optional branch
+alongside `AGENT-001`, never as a mandatory dependency.
+
+**Confidence:** Medium on value, low on coverage. Symbolic execution is mature
+and `angr` is well established, but the fraction of *real ECU* functions it can
+handle is unknown and probably small: interrupt-driven code, memory-mapped
+peripherals, timing dependence, and path explosion each defeat it, and legacy
+automotive firmware has all four. The synthetic fixtures would likely flatter
+it, since they were written to be self-contained.
+
+**Unresolved:** Whether coverage on real firmware is high enough to justify a
+second analysis engine. Also unverified from here: `angr`'s support for
+whichever architecture `RESEARCH-001` recommends — a hard prerequisite that
+should be checked before assignment, not after.
+
+**Next falsifiable test:** if assigned, run it blind against the synthetic
+fixtures and measure recovered-condition accuracy and equivalence-class
+precision/recall against hidden ground truth. Report the unsupported rate as a
+headline number, not a footnote.
+
 ## 2026-08-17 — Source material reviewed (pre-graph)
 
 The supplied project brief defines the product thesis as an autonomous embedded-
