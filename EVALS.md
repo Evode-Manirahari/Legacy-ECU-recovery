@@ -70,3 +70,10 @@ Record the first complete run before prompt optimization. Store tool versions,
 configuration, inputs, outputs, duration, failures, and scorer version. Never
 silently replace a failed result.
 
+## Synthetic dataset v1 protocol
+
+The binding scoring rules for the current six fixtures are documented in
+[`docs/synthetic-lab.md`](docs/synthetic-lab.md). Prompt 3 must analyze only each
+`firmware.stripped` file, freeze its results, and then reveal symbols-on addresses
+and JSON ground truth. Function and call-edge scores use exact address matches;
+behavior uses exact integer equality. Report raw counts with every rate.

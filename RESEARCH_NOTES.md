@@ -45,3 +45,25 @@ Future entries should record date, question, sources or experiment identifiers,
 observations, decision impact, unresolved uncertainty, and the next falsifiable
 test. Never store questionable proprietary firmware in this repository.
 
+## 2026-08-17 — Synthetic architecture selected
+
+**Question:** Which architecture minimizes uncertainty for the ground-truth lab?
+
+**Observation:** The active host is x86-64 macOS and includes Apple Clang 16,
+`strip`, and `nm`. It does not include an ARM cross-linker, ARM binutils, QEMU, or
+Ghidra. Ghidra's official processor-support FAQ includes x86-64, and Unicorn's
+official architecture list includes x86-64.
+
+**Decision:** Use x86-64 Mach-O for dataset v1. This is not the real ECU target.
+It lets the project validate compilation, stripping, symbol-address ground truth,
+and native behavior now. Revisit the target only through a versioned new dataset.
+
+**Sources:**
+
+- https://github.com/NationalSecurityAgency/ghidra/wiki/Frequently-asked-questions
+- https://github.com/NationalSecurityAgency/ghidra/blob/master/GhidraDocs/GettingStarted.md
+- https://www.unicorn-engine.org/
+
+**Next falsifiable test:** Prompt 3 must import one `firmware.stripped` artifact
+through PyGhidra and recover expected function starts without access to source or
+ground-truth metadata.

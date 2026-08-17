@@ -18,6 +18,8 @@ report. Firmware is treated as data and is never executed by the intake path.
 - Markdown engineering report with clear `known`, `inferred`, and `unknown`
   distinctions.
 - A narrow adapter boundary for importing future Ghidra analysis.
+- Six reproducible synthetic firmware fixtures with isolated ground truth,
+  symbols-on/stripped builds, behavior probes, and artifact hashes.
 
 ## Quick start
 
@@ -47,6 +49,16 @@ The doctor command reports missing Ghidra as a warning during initial
 development. Ghidra is not required until the static-analysis integration
 milestone.
 
+Rebuild and verify the synthetic laboratory:
+
+```bash
+uv run python scripts/build_synthetic.py
+uv run pytest tests/test_synthetic_lab.py
+```
+
+See [docs/synthetic-lab.md](docs/synthetic-lab.md) for the visibility boundary,
+architecture rationale, metadata contract, and exact evaluation formulas.
+
 Only analyze firmware you are authorized to possess and inspect. Do not use a
 generated conclusion as a basis for flashing a vehicle or controlling hardware.
 
@@ -60,8 +72,8 @@ src/ecu_recovery/agent/   reserved agent boundary; no AI integration yet
 src/ecu_recovery/evidence/ evidence model public boundary
 src/ecu_recovery/reports/ reporting public boundary
 docs/               architecture, research decisions, experiments
-samples/synthetic/  Prompt 2 laboratory placeholder
-scripts/            project automation placeholder
+samples/synthetic/  known-source firmware laboratory and generated artifacts
+scripts/            reproducible dataset builder
 tests/              automated tests
 ```
 

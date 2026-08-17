@@ -19,6 +19,9 @@ ecu-recovery analyze <firmware>
 The development environment is resolved by uv and pinned in `uv.lock`. Pytest,
 Ruff, and mypy are development-only dependencies.
 
+Synthetic fixture generation is a development workflow, not a CLI command. The
+builder is invoked as `uv run python scripts/build_synthetic.py`.
+
 ## Current data flow
 
 ```text
@@ -60,13 +63,19 @@ deterministic byte-only intake ──────┐
 - `binary`, `analysis`, `agent`, `evidence`, and `reports` provide stable package
   boundaries for later prompts. The first four public boundaries re-export only
   implemented domain behavior. The agent package is intentionally empty.
+- `scripts/build_synthetic.py` compiles six x86-64 Mach-O fixtures with pinned
+  flags, executes their embedded self-tests, strips investigator-visible copies,
+  checks expected symbols, and records hashes plus compiler provenance.
+- `samples/synthetic` separates C source, JSON ground truth, and compiled
+  artifacts. The only investigator-visible artifact in a blinded evaluation is
+  each sample's `firmware.stripped` executable.
 
 ## Components that do not exist
 
-There is currently no synthetic firmware program, PyGhidra integration,
-complete static-analysis interface, agent tool layer, MCP server, AI model
-integration, autonomous loop, emulator, peripheral model, experiment engine,
-reconstruction pipeline, or graphical interface.
+There is currently no PyGhidra integration, complete static-analysis interface,
+agent tool layer, MCP server, AI model integration, autonomous loop, emulator,
+peripheral model, experiment engine, reconstruction pipeline, real ECU fixture,
+or graphical interface.
 
 ## Boundaries
 

@@ -66,3 +66,22 @@ of third-party dependencies in Prompt 1.
 The doctor command detects both dependencies but returns success with a clear
 warning when either is unavailable. Prompt 3 may strengthen these checks after
 Ghidra becomes an implemented execution path.
+
+## 2026-08-17 — Use x86-64 Mach-O for synthetic dataset v1
+
+**Status:** accepted for the laboratory only
+
+The first fixtures target little-endian `x86_64-apple-darwin`. The current host
+can build, strip, inspect, and execute this target without an unpinned external
+cross-toolchain. Ghidra and Unicorn both support x86-64. This does not select the
+eventual legacy ECU family or processor; that remains gated on authorized real
+samples, documentation, tool support, emulator feasibility, and expert input.
+
+## 2026-08-17 — Separate evaluation truth from investigator input
+
+**Status:** accepted
+
+The investigator receives only `firmware.stripped`. Source, JSON ground truth,
+symbols-on binaries, callable behavior libraries, and build records are evaluator
+assets. Symbols-on and stripped executables originate from the same compiled file
+so expected functions can be matched by exact start address after a blinded run.

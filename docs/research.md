@@ -1,9 +1,19 @@
 # Research decisions
 
+## Selected laboratory architecture
+
+Synthetic dataset v1 uses little-endian x86-64 Mach-O on macOS. This choice is
+limited to controlled ground-truth experiments. It was selected because the
+current host can compile, strip, inspect, and execute it reproducibly, while both
+Ghidra and Unicorn support x86-64.
+
+See [`synthetic-lab.md`](synthetic-lab.md) for the complete rationale and scoring
+protocol.
+
 ## Open selection: first ECU family
 
-No processor family is selected yet. That is the project's highest-leverage
-research decision. Score candidates using:
+No real ECU processor family is selected yet. That is the project's highest-
+leverage product research decision. Score candidates using:
 
 1. legally available firmware samples;
 2. processor and memory-map documentation;
@@ -29,4 +39,3 @@ Only use firmware that the investigator is authorized to analyze. Keep the
 initial product read-only. Generated analysis may be wrong and must not be used
 to flash an ECU or operate a vehicle. Any future execution belongs in an isolated
 emulator with explicit resource limits, never on the host or connected hardware.
-

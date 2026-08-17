@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "sample_id": "lookup_1d_v1",
+  "title": "One-dimensional interpolated lookup table",
+  "source": "source/lookup_1d.c",
+  "probe_parameters": ["input", "unused_1", "unused_2"],
+  "expected_functions": ["lookup_1d", "main", "sample_probe"],
+  "expected_function_roles": {
+    "lookup_1d": "Clamps to a six-point calibration table and linearly interpolates between breakpoints.",
+    "main": "Runs embedded behavior self-tests and returns zero only when all pass.",
+    "sample_probe": "Passes the first probe input to the one-dimensional lookup."
+  },
+  "classification_functions": ["lookup_1d"],
+  "expected_call_edges": [
+    {"caller": "main", "callee": "sample_probe"},
+    {"caller": "sample_probe", "callee": "lookup_1d"}
+  ],
+  "expected_constants": [0, 8, 19, 20, 33, 40, 52, 60, 75, 80, 100],
+  "expected_behavior": [
+    {"inputs": {"input": -1, "unused_1": 0, "unused_2": 0}, "output": 0},
+    {"inputs": {"input": 50, "unused_1": 0, "unused_2": 0}, "output": 26},
+    {"inputs": {"input": 70, "unused_1": 0, "unused_2": 0}, "output": 42},
+    {"inputs": {"input": 100, "unused_1": 0, "unused_2": 0}, "output": 75}
+  ]
+}

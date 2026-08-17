@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "sample_id": "lookup_2d_v1",
+  "title": "Two-dimensional calibration lookup table",
+  "source": "source/lookup_2d.c",
+  "probe_parameters": ["rpm_index", "load_index", "unused"],
+  "expected_functions": ["clamp_index", "lookup_2d", "main", "sample_probe"],
+  "expected_function_roles": {
+    "clamp_index": "Clamps a table index to the inclusive range from zero to a supplied maximum.",
+    "lookup_2d": "Clamps row and column indexes and returns a value from a three-by-four calibration table.",
+    "main": "Runs embedded behavior self-tests and returns zero only when all pass.",
+    "sample_probe": "Passes the first two probe inputs to the two-dimensional lookup."
+  },
+  "classification_functions": ["clamp_index", "lookup_2d"],
+  "expected_call_edges": [
+    {"caller": "main", "callee": "sample_probe"},
+    {"caller": "sample_probe", "callee": "lookup_2d"},
+    {"caller": "lookup_2d", "callee": "clamp_index"}
+  ],
+  "expected_constants": [2, 3, 10, 12, 14, 15, 18, 19, 22, 24, 26, 30, 36],
+  "expected_behavior": [
+    {"inputs": {"rpm_index": 0, "load_index": 0, "unused": 0}, "output": 10},
+    {"inputs": {"rpm_index": 1, "load_index": 2, "unused": 0}, "output": 22},
+    {"inputs": {"rpm_index": -1, "load_index": 3, "unused": 0}, "output": 18},
+    {"inputs": {"rpm_index": 8, "load_index": 9, "unused": 0}, "output": 36}
+  ]
+}

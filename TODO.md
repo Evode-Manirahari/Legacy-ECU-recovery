@@ -3,19 +3,18 @@
 Items are ordered by the supplied build-prompt sequence. Moving an item between
 sections requires the preceding prompt's acceptance criteria to pass.
 
-## NOW — Prompt 2: synthetic firmware laboratory
+## NOW — Prompt 3: deterministic PyGhidra analysis
 
-- Select and document one architecture based on compiler, Ghidra, documentation,
-  and future-emulator availability.
-- Build six known-source embedded C programs with reproducible compiler settings.
-- Preserve symbols-on and symbols-stripped builds separately.
-- Store machine-readable ground truth away from investigator-visible artifacts.
-- Validate every binary-to-metadata relationship with tests.
-- Define exact reverse-engineering accuracy scoring against the fixtures.
+- Install or discover a compatible Ghidra/PyGhidra environment.
+- Define plain analysis models and an engine-independent adapter interface.
+- Analyze one stripped synthetic fixture without reading its ground truth.
+- Export functions, memory regions, calls, strings, bytes, and constants as JSON.
+- Mark Ghidra integration tests so they skip with a useful reason when absent.
+- Score discovered functions against symbols-on addresses only after results are
+  saved.
 
 ## NEXT
 
-- Prompt 3: add deterministic PyGhidra analysis for the chosen architecture.
 - Prompt 4: introduce bounded, validated Python investigation tools.
 - Prompt 5: expose stable tools through a local, least-privilege MCP server.
 - Prompts 6–9: investigator, persistent evidence memory, evaluation harness,
@@ -37,3 +36,6 @@ sections requires the preceding prompt's acceptance criteria to pass.
 - Prompt 0: persistent engineering contract, evaluation plan, and threat model.
 - Prompt 1: Python package boundaries, uv lockfile, pytest, Ruff, strict mypy,
   minimal CLI, environment doctor, and unit tests.
+- Prompt 2: six reproducible x86-64 Mach-O fixtures, source/ground-truth
+  separation, symbols-on and stripped artifacts, behavior probes, metadata,
+  exact scoring rules, and 20 laboratory tests.
