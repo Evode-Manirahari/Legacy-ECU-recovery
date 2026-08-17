@@ -35,6 +35,12 @@ uv resolves the environment and pins it in `uv.lock`. Ruff lints and formats,
 mypy runs strict, pytest runs the suite. `uv sync --extra ghidra` installs
 PyGhidra.
 
+`.github/workflows/ci.yml` runs tests, lint, format, and types on Linux against
+the frozen lockfile. It deliberately does **not** install Ghidra, so CI is the
+standing proof that a missing Ghidra never breaks the repository: the
+Ghidra-marked tests skip with a stated reason, and the x86-64 Mach-O fixture
+tests skip through their own platform guards.
+
 ## Data flow that exists
 
 ```text
@@ -118,7 +124,8 @@ These are stated here because this document must not overstate what exists.
 | `EVAL-STATIC-001` | No harness, no `artifacts/evals/` outputs, no gate-target comparison. |
 | `TOOLS-001` | No agent-facing tool layer with input/output schemas. |
 | `RESEARCH-001` | No `docs/research/ecu-target-matrix.{md,csv}`. |
-| repository layout | No `graph/`, `prompts/`, `ecu-project.graph.yaml`, or `artifacts/`. |
+| `GRAPH-001` | No `ecu-project.graph.yaml`, `graph/`, `prompts/`, or `artifacts/`. Owned by this node; nothing else may create them. |
+| CI coverage | CI runs on Linux only, so the x86-64 Mach-O fixture tests never execute there. Covering them needs an x86-64 macOS runner or a portable fixture target — a `DATA-001` decision. |
 
 ## Components that do not exist
 
