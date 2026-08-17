@@ -1,0 +1,66 @@
+# Current Architecture
+
+This document describes only code that exists in the repository today. Planned
+components belong in `TODO.md`, not here.
+
+## Runtime
+
+The project is a Python 3.11+ package using a `src/` layout. It has no runtime
+third-party dependencies. The `ecu-recovery` console entry point and
+`python -m ecu_recovery` both route to the same `argparse` CLI.
+
+The only implemented command is:
+
+```text
+ecu-recovery analyze <firmware>
+```
+
+## Current data flow
+
+```text
+allow-listed firmware file
+          │
+          ▼
+deterministic byte-only intake ──────┐
+          │                          │
+          ▼                          ▼
+   BinaryProfile              optional Ghidra JSON export
+          │                          │
+          └────────────┬─────────────┘
+                       ▼
+               SQLite investigation store
+                       │
+                       ▼
+                Markdown report
+```
+
+## Components that exist
+
+- `ecu_recovery.intake` validates a bounded local firmware file and calculates
+  hashes, Shannon entropy, fill-byte counts, and exact repeated 256-byte blocks.
+  It treats input exclusively as bytes and never executes it.
+- `ecu_recovery.models` defines binary, function, and hypothesis records plus
+  the known/inferred/unknown certainty vocabulary.
+- `ecu_recovery.store` persists profiles, function records, and hypotheses in
+  SQLite.
+- `ecu_recovery.ghidra.bridge` validates a small JSON function export. It is a
+  data adapter only; the repository does not currently invoke Ghidra or
+  PyGhidra.
+- `ecu_recovery.report` renders the stored investigation as Markdown.
+- `ecu_recovery.cli` connects intake, optional JSON import, storage, and report
+  generation.
+
+## Components that do not exist
+
+There is currently no doctor command, synthetic firmware laboratory, PyGhidra
+integration, complete static-analysis interface, agent tool layer, MCP server,
+AI model integration, autonomous loop, emulator, peripheral model, experiment
+engine, reconstruction pipeline, or graphical interface.
+
+## Boundaries
+
+Firmware remains local and is read as untrusted data. The current CLI accepts
+only `.bin`, `.img`, and `.rom` files up to 64 MiB. Any future Ghidra process must
+remain outside the core domain layer and return plain structured records. Model
+providers must remain replaceable and must receive only bounded analysis data.
+
