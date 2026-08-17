@@ -102,12 +102,21 @@ scripts/            reproducible dataset builder
 tests/              automated tests
 ```
 
-## Next milestone
+## How this project is built
 
-Wrap the analysis session in narrowly scoped, validated agent tools with
-documented input, output, failure cases, and output-size limits — still with no
-model attached. After that, the investigator agent explains five functions and
-each explanation cites inspectable evidence.
+Development follows the dependency graph in `docs/MASTER_SPEC.md`, which is the
+authoritative engineering specification. Work is executed one bounded node at a
+time, and an edge means the prerequisite was *verified* — not that an agent
+reported done.
 
-See [docs/architecture.md](docs/architecture.md) and
-[docs/experiments.md](docs/experiments.md) for the execution plan.
+The current frontier, open decisions, and node status live in
+[TODO.md](TODO.md). What actually exists is in
+[ARCHITECTURE.md](ARCHITECTURE.md); how correctness is measured is in
+[EVALS.md](EVALS.md).
+
+No AI agent is introduced before the static MVP gate passes, because until
+deterministic retrieval is measurable an error cannot be attributed among Ghidra,
+the parser, the tool layer, the context, the model, and the prompt.
+
+See also [docs/architecture.md](docs/architecture.md) and
+[docs/experiments.md](docs/experiments.md).

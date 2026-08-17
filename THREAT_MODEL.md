@@ -26,6 +26,20 @@ Only analyze:
 
 Record provenance and authorization alongside every non-synthetic sample.
 
+## Mandatory boundaries
+
+These are required by `docs/MASTER_SPEC.md` and are not negotiable by any node.
+
+| Boundary | Meaning |
+|---|---|
+| Authorized firmware only | Every non-synthetic sample carries recorded provenance and authorization. |
+| No live vehicle control | The system never actuates a vehicle or any physical control. |
+| No firmware flashing | The system never writes firmware to a device. |
+| No immobilizer or security-access bypass | Not implemented, not researched as a capability. |
+| No credential or key extraction | Not implemented as a feature or a tool. |
+| No arbitrary host execution | A model never gets shell, arbitrary Python, unrestricted filesystem, or network. |
+| Sandbox generated code | Any C the system generates is compiled and run under isolation, never trusted on the host. |
+
 ## Prohibited capabilities
 
 Do not implement:
@@ -36,10 +50,15 @@ Do not implement:
 - remote exploitation;
 - live vehicle control;
 - vehicle-network attacks or CAN injection;
-- modification or deployment of a real safety-critical ECU.
+- modification or deployment of a real safety-critical ECU;
+- destructive ECU operations.
 
 No current or future “analysis” command may silently expand into one of these
 capabilities.
+
+Generated-code sandboxing is a **future** control: no code generation exists yet,
+and the isolation it requires is not built. It is listed here because the boundary
+must be defined before the reconstruction phase, not after.
 
 ## Principal threats and controls
 
@@ -68,7 +87,7 @@ firmware-writing capability.
 
 ### Open risk: Ghidra parses untrusted input in our process
 
-As of Prompt 3, `--ghidra` starts a JVM inside the `ecu-recovery` process and
+`--ghidra` starts a JVM inside the `ecu-recovery` process and
 hands the binary to Ghidra's loaders, analyzers, and decompiler. A malicious
 firmware image that exploits a Ghidra parser would be executing in our process,
 with our filesystem access and no memory, CPU, or time limit.
@@ -86,8 +105,9 @@ Partial mitigations in place today:
 - Ghidra's Java objects cannot escape `analysis/ghidra.py`.
 
 Not in place: process isolation, memory limits, CPU limits, wall-clock limits,
-and a network-disabled sandbox. Prompt 16 owns closing this, and Prompt 19's
-readiness review must treat it as a blocker for real firmware.
+and a network-disabled sandbox. The security review that gates the real-firmware
+phase must treat this as a blocker, and no node may introduce third-party firmware
+until it is closed.
 
 Passing tests does not establish that the system is secure. Isolation controls
 must be actively tested before untrusted third-party firmware enters the

@@ -1,8 +1,56 @@
 # Evaluation Contract
 
+Correctness is measured against **controlled ground-truth binaries** whose source
+this repository compiled and hides from the analysis system. “The output looks
+good” is not an acceptance criterion.
+
 The project is successful only when it produces repeatable, evidence-backed
-results against ground truth and saves expert time. “The output looks good” is
-not an acceptance criterion.
+results against ground truth and saves expert time.
+
+## Verification hierarchy
+
+Use the highest level that can decide the property.
+
+| Level | Method | Use for |
+|---|---|---|
+| 1 | Deterministic | test result, compiler result, schema validation, binary/call-graph/behavior comparison |
+| 2 | Ground-truth comparison | hidden fixture data |
+| 3 | Human expert | semantic engineering judgment |
+| 4 | LLM judge | only when none of the above can reasonably evaluate it |
+
+> If software can prove it, do not ask another model whether it looks correct.
+
+## `EVAL-STATIC-001` gate targets
+
+Starting thresholds for controlled synthetic fixtures — not immutable truths:
+
+| Metric | Target |
+|---|---|
+| Binary import success | 100% |
+| Serialization success | 100% |
+| Function discovery recall | ≥ 95% |
+| Function discovery precision | ≥ 95% |
+| Call-edge recall | ≥ 90% |
+| Unexpected crashes | 0 |
+
+If observed baseline makes a threshold unrealistic, **do not quietly lower it**.
+Record the observed baseline, the cause, the proposed new threshold, and the
+human approval.
+
+## Agent-phase targets
+
+Applied only after `GATE-STATIC-MVP`:
+
+| Metric | Target |
+|---|---|
+| Evidence references valid | 100% |
+| Schema compliance | 100% |
+| Unsupported factual claims | ≤ 5% |
+| Tool hallucinations | 0 |
+| Critical unsupported claims | 0 |
+
+Semantic classification accuracy is baselined first and only then set as a formal
+gate. Do not invent a flattering threshold before seeing performance.
 
 ## Evaluation dataset
 
@@ -73,17 +121,22 @@ silently replace a failed result.
 ## Synthetic dataset v1 protocol
 
 The binding scoring rules for the current six fixtures are documented in
-[`docs/synthetic-lab.md`](docs/synthetic-lab.md). Prompt 3 must analyze only each
-`firmware.stripped` file, freeze its results, and then reveal symbols-on addresses
-and JSON ground truth. Function and call-edge scores use exact address matches;
+[`docs/synthetic-lab.md`](docs/synthetic-lab.md). Any static-analysis run must
+analyze only each `firmware.stripped` file, freeze its results, and only then
+reveal symbols-on addresses and JSON ground truth. Function and call-edge scores use exact address matches;
 behavior uses exact integer equality. Report raw counts with every rate.
 
-## Prompt 3 static-analysis baseline
+## Pre-graph static-analysis measurement
 
-First recorded measurement. Engine: Ghidra 12.1.2 via PyGhidra 2.2.1, Zulu
-OpenJDK 21, macOS x86-64. Detected language `x86:LE:64:default`. Input:
-`firmware.stripped` only; ground truth read from the symbols-on build afterwards.
-Asserted in `tests/test_analysis_ghidra.py`.
+**This is not `EVAL-STATIC-001`.** No evaluation harness exists, no
+`artifacts/evals/` outputs exist, and no comparison against the gate targets
+above has been run. These numbers come from assertions inside
+`tests/test_analysis_ghidra.py`, recorded under the deprecated linear sequence.
+They are evidence that the extraction path is wired correctly — not a gate result.
+
+Engine: Ghidra 12.1.2 via PyGhidra 2.2.1, Zulu OpenJDK 21, macOS x86-64. Detected
+language `x86:LE:64:default`. Input: `firmware.stripped` only; ground truth read
+from the symbols-on build afterwards.
 
 | Metric | Fixture | Result | Counts |
 |---|---|---|---|

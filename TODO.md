@@ -1,58 +1,87 @@
 # Work Plan
 
-Items are ordered by the supplied build-prompt sequence. Moving an item between
-sections requires the preceding prompt's acceptance criteria to pass.
+Work is tracked as nodes of the development graph in `docs/MASTER_SPEC.md`. A
+node moves only when its verification conditions pass.
 
-## NOW — Prompt 4: bounded, validated agent tools
+## Node status
 
-- Wrap the session capabilities as narrowly scoped tools with structured input
-  and output, building on the bounds already in `analysis/base.py`.
-- Give every tool explicit validation and typed failures rather than tracebacks.
-- Write `TOOL_DESIGN.md` recording purpose, input, output, failure cases, and
-  maximum output size for each tool.
-- Cover invalid input and oversized results with tests.
-- Keep the layer free of any model dependency.
+`UNVERIFIED-UNDER-GRAPH` means code exists from the deprecated linear sequence
+but was never evaluated against this node's contract. See `ADR-002`.
+
+| Node | Status | Note |
+|---|---|---|
+| `SPEC-001` | VERIFYING | this change |
+| `REPO-001` | UNVERIFIED-UNDER-GRAPH | package, CLI, doctor, tooling exist |
+| `DATA-001` | UNVERIFIED-UNDER-GRAPH | 6 of 8 fixture categories exist |
+| `RESEARCH-001` | PENDING | no target matrix exists |
+| `EVIDENCE-001` | UNVERIFIED-UNDER-GRAPH | no Relationship/Evidence entity, no history |
+| `GHIDRA-001` | UNVERIFIED-UNDER-GRAPH | adapter exists; no analysis-warnings field |
+| `EVAL-STATIC-001` | PENDING | no harness, no results artifacts |
+| `TOOLS-001` | PENDING | no bounded tool layer |
+| `INTEGRATION-STATIC-001` | PENDING | |
+| `GATE-STATIC-MVP` | PENDING | blocks all agent work |
+
+## NOW
+
+Human decisions required before another node is assigned:
+
+1. **Supply `docs/MASTER_SPEC.md`.** The file is absent. Every node cites it as
+   authoritative, and it must be added by a human rather than reconstructed from
+   a conversation, so that what nodes cite is what was actually written.
+2. **Assign node status for pre-graph work.** Decide whether `REPO-001`,
+   `DATA-001`, `EVIDENCE-001`, and `GHIDRA-001` are re-run under their contracts
+   or accepted with recorded exceptions. `ADR-002` holds them unverified until
+   then.
+3. **Decide whether graph infrastructure is in scope.** `graph/`, `prompts/`,
+   `ecu-project.graph.yaml`, and `artifacts/` appear in the specification's
+   repository layout but belong to no assigned node.
 
 ## NEXT
 
-- Prompt 5: expose stable tools through a local, least-privilege MCP server.
-- Prompts 6–9: investigator, persistent evidence memory, evaluation harness,
-  and structured engineering report.
+Once the above are resolved, in dependency order:
 
-## Known gaps carried forward
+- `REPO-001` — reconcile the package against its contract; add the missing
+  repository layout and CI configuration.
+- `DATA-001` — add the two missing fixture categories: integer/bit-mask
+  manipulation and timer-like counter logic.
+- `RESEARCH-001` — produce `docs/research/ecu-target-matrix.{md,csv}`. Recommend
+  candidates only; final architecture selection is a human gate.
+- `EVIDENCE-001` — add `Relationship` and `Evidence` entities, the hypothesis
+  status enum (`UNTESTED`, `SUPPORTED`, `WEAKENED`, `REJECTED`, `CONFIRMED`),
+  migrations, and preserved hypothesis history.
+- `GHIDRA-001` — reconcile against its contract, including analysis warnings.
+- `EVAL-STATIC-001` — build the deterministic harness and produce
+  `artifacts/evals/static-results.json` and `static-report.md`.
+- `TOOLS-001` — bounded, schema-validated agent-facing tools; no LLM, no MCP.
+- `INTEGRATION-STATIC-001` — end-to-end controlled flow plus full regression.
+- `GATE-STATIC-MVP` — verification node.
 
-- Intake rejects extension-free files. Raw ROM dumps frequently have no
-  extension, so the allowlist needs a decision before Prompt 21.
-- Ghidra parses untrusted binaries in our own process. Prompt 16 must decide
-  between accepting this, sandboxing the JVM, or moving to a headless subprocess.
-- `--base-address` sets the image base for a raw dump but is only exercised
-  against Mach-O fixtures that carry their own base. It needs a raw-binary
-  fixture before it can be called verified.
-- Function classification, evidence validity, and confidence calibration from
-  `docs/synthetic-lab.md` are defined but unmeasured; they need Prompt 8's
-  harness.
+`RESEARCH-001` and `EVIDENCE-001` are independent of `DATA-001` and may run in
+parallel worktrees. Maximum three parallel workers. Do not parallelize work that
+shares a bottleneck.
 
 ## LATER
 
-- Prompts 10–15: synthetic CPU emulation, controlled experiments, minimal
-  peripherals, human-approved agent experiments, one-function C reconstruction,
-  and context engineering.
-- Prompts 16–18: sandbox hardening, observability, and a thin product interface.
-- Prompts 19–22: real-firmware readiness review, approved target research,
-  authorized demonstration, and product-value measurement.
-- Automatic architecture detection, broader architecture support, and any
-  deployment-oriented capability require separate evidence and authorization.
+Gated, in order. Do not begin a phase before its gate passes.
 
-## COMPLETED
+- **Agent phase** (after `GATE-STATIC-MVP`): `AGENT-001`, `HYPOTHESIS-001`,
+  `EVAL-AGENT-001`, `REPORT-001`, `GATE-AGENT-MVP`.
+- **Emulation** (after `GATE-AGENT-MVP`): `EMU-001`, `EMU-TRACE-001`,
+  `PERIPHERAL-001`, `GATE-EMULATION`.
+- **Experimentation**: proposal → deterministic validator → human approval →
+  execution → evidence → hypothesis revision.
+- **Reconstruction**: one function, compiled, behaviorally verified.
+- **Real authorized ECU firmware**: only after every prior gate, a security
+  review, documented authorization, and human approval.
 
-- Prompt 0: persistent engineering contract, evaluation plan, and threat model.
-- Prompt 1: Python package boundaries, uv lockfile, pytest, Ruff, strict mypy,
-  minimal CLI, environment doctor, and unit tests.
-- Prompt 2: six reproducible x86-64 Mach-O fixtures, source/ground-truth
-  separation, symbols-on and stripped artifacts, behavior probes, metadata,
-  exact scoring rules, and 20 laboratory tests.
-- Prompt 3: engine-free analysis models, a bounded `StaticAnalysisEngine` /
-  `StaticAnalysisSession` interface, a PyGhidra implementation of all thirteen
-  capabilities, JSON export, `analyze --ghidra`, stricter Ghidra discovery, and
-  24 Ghidra integration tests that skip with a reason when Ghidra is absent
-  (81 tests total; 57 run without Ghidra).
+## Carried technical gaps
+
+Recorded so they are not lost between nodes. Each belongs to a node above.
+
+- Ghidra parses untrusted input in our own process with no sandbox, memory limit,
+  or timeout. A blocker for real firmware; see `THREAT_MODEL.md`.
+- Intake rejects extension-free files, which raw ROM dumps commonly are.
+- `--base-address` is exercised only against Mach-O fixtures that carry their own
+  base; it needs a raw-binary fixture before it can be called verified.
+- Four of six fixtures are unscored, and constant detection, table detection,
+  evidence validity, and calibration are defined but unmeasured.
