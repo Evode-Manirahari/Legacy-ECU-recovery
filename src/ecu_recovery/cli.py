@@ -15,6 +15,42 @@ from .report import write_markdown
 from .store import InvestigationStore
 
 
+class GraphUnavailableError(RuntimeError):
+    """The development-graph package or its graph file could not be located."""
+
+
+def _render_development_graph(graph_file: Path | None, command: str) -> str:
+    """Load the development graph and render the requested view.
+
+    `graph/` is development scaffolding that lives beside `src/`, not inside the
+    installed package, so it is imported lazily and only when this subcommand
+    runs. That keeps `ecu_recovery` free of a hard dependency on the machinery
+    used to build it: an installed copy of the product still works with no
+    graph package present.
+    """
+    from .doctor import find_project_root
+
+    root = find_project_root()
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
+    try:
+        import graph as development_graph
+    except ImportError as error:
+        raise GraphUnavailableError(
+            f"development graph package not importable from {root}: {error}"
+        ) from error
+    loaded = development_graph.load_graph(graph_file or (root / "ecu-project.graph.yaml"))
+    if command == "ready":
+        return development_graph.render_ready(loaded)
+    return development_graph.render_status_table(loaded)
+
+
+def run_graph(args: argparse.Namespace) -> int:
+    """Render the development graph. Read-only: it never edits node status."""
+    print(_render_development_graph(args.graph_file, args.graph_command))
+    return 0
+
+
 def _parse_optional_address(value: str | None) -> int | None:
     if value is None:
         return None
@@ -33,6 +69,18 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help="repository root to inspect (defaults to the nearest pyproject.toml)",
     )
+    graph_parser = subparsers.add_parser("graph", help="inspect the development graph")
+    graph_commands = graph_parser.add_subparsers(dest="graph_command", required=True)
+    for name, description in (
+        ("status", "show every development node and its status"),
+        ("ready", "list only nodes whose dependencies have all passed"),
+    ):
+        command = graph_commands.add_parser(name, help=description)
+        command.add_argument(
+            "--graph-file",
+            type=Path,
+            help="graph definition to read (defaults to ecu-project.graph.yaml)",
+        )
     analyze = subparsers.add_parser("analyze", help="profile a firmware image without executing it")
     analyze.add_argument("firmware")
     analyze.add_argument(
@@ -129,9 +177,11 @@ def main(argv: list[str] | None = None) -> int:
             report = run_doctor(args.project_root)
             print(render_doctor_report(report))
             return 0 if report.successful else 1
+        if args.command == "graph":
+            return run_graph(args)
         if args.command == "analyze":
             return run_analyze(args)
-    except (AnalysisError, IntakeError, OSError, ValueError) as error:
+    except (AnalysisError, GraphUnavailableError, IntakeError, OSError, ValueError) as error:
         parser.exit(2, f"error: {error}\n")
     return 1
 

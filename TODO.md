@@ -12,8 +12,8 @@ The graph itself is now machine-readable in `ecu-project.graph.yaml`. This table
 is the human-readable view of it; the file is authoritative.
 
 ```bash
-uv run python -c "import graph; print(graph.render_status_table(graph.load_graph()))"
-uv run python -c "import graph; print(graph.render_ready(graph.load_graph()))"
+uv run ecu-recovery graph status
+uv run ecu-recovery graph ready
 ```
 
 | Node | Status | Note |

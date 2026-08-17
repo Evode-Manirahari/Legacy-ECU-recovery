@@ -33,7 +33,9 @@ packages = ["src/ecu_recovery"]
 [tool.pytest.ini_options]
 addopts = "-q"
 testpaths = ["tests"]
-pythonpath = ["src"]
+# "." puts the repository root on the path so the top-level `graph/`
+# development package imports without per-test bootstrapping.
+pythonpath = ["src", "."]
 # Ghidra tests run by default and skip themselves with a reason when Ghidra or
 # PyGhidra is missing. Opt out of the slow JVM path with `-m "not ghidra"`.
 markers = [
@@ -54,7 +56,9 @@ indent-style = "space"
 [tool.mypy]
 python_version = "3.11"
 strict = true
-files = ["src", "tests"]
+# `graph` is development scaffolding rather than shipped code, but it decides
+# what work may start, so it is type-checked to the same standard.
+files = ["src", "tests", "graph"]
 pretty = true
 show_error_codes = true
 
