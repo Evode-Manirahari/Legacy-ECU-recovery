@@ -1,0 +1,1414 @@
+{
+  "aggregate": {
+    "binary_import": {
+      "denominator": 8,
+      "numerator": 8,
+      "percent": 100.0,
+      "rate": 1.0
+    },
+    "call_edge_precision": {
+      "denominator": 24,
+      "numerator": 24,
+      "percent": 100.0,
+      "rate": 1.0
+    },
+    "call_edge_recall": {
+      "denominator": 24,
+      "numerator": 24,
+      "percent": 100.0,
+      "rate": 1.0
+    },
+    "constants_by_evidence": {
+      "operand": 20,
+      "reachable-table-data": 10,
+      "referenced-data": 7,
+      "unsupported": 4
+    },
+    "constants_recovered": {
+      "denominator": 41,
+      "numerator": 27,
+      "percent": 65.8537,
+      "rate": 0.6585365853658537
+    },
+    "function_discovery_precision": {
+      "denominator": 32,
+      "numerator": 32,
+      "percent": 100.0,
+      "rate": 1.0
+    },
+    "function_discovery_recall": {
+      "denominator": 32,
+      "numerator": 32,
+      "percent": 100.0,
+      "rate": 1.0
+    },
+    "function_start_address_accuracy": {
+      "denominator": 32,
+      "numerator": 32,
+      "percent": 100.0,
+      "rate": 1.0
+    },
+    "reported_out_of_scope_functions": 0,
+    "serialization": {
+      "denominator": 8,
+      "numerator": 8,
+      "percent": 100.0,
+      "rate": 1.0
+    },
+    "unexpected_crashes": 0
+  },
+  "environment": {
+    "analyzer_schema_version": 1,
+    "engine": "ghidra",
+    "engine_version": "12.1.2",
+    "platform_machine": "x86_64",
+    "platform_system": "Darwin",
+    "pyghidra_version": "2.2.1",
+    "python_version": "3.11.15"
+  },
+  "fixtures": [
+    {
+      "analysis_digest": "323f6affc4be3e4f0d7d3f12148abd4578437bbaef285579cd74a66e30113f59",
+      "analysis_warnings": [
+        {
+          "code": "uncovered-executable-bytes",
+          "count": 1,
+          "severity": "info"
+        },
+        {
+          "code": "uninitialized-memory-block",
+          "count": 1,
+          "severity": "info"
+        }
+      ],
+      "call_edges": {
+        "expected_count": 4,
+        "false_positives": [],
+        "missed": [],
+        "precision": {
+          "denominator": 4,
+          "numerator": 4,
+          "percent": 100.0,
+          "rate": 1.0
+        },
+        "recall": {
+          "denominator": 4,
+          "numerator": 4,
+          "percent": 100.0,
+          "rate": 1.0
+        },
+        "reported_in_scope_count": 4,
+        "reported_out_of_scope_count": 0,
+        "true_positives": [
+          [
+            "0x100000ee0",
+            "0x100000e90"
+          ],
+          [
+            "0x100000ee0",
+            "0x100000eb0"
+          ],
+          [
+            "0x100000f10",
+            "0x100000ee0"
+          ],
+          [
+            "0x100000f20",
+            "0x100000f10"
+          ]
+        ]
+      },
+      "constants": {
+        "by_evidence": {
+          "operand": 4,
+          "reachable-table-data": 0,
+          "referenced-data": 0,
+          "unsupported": 0
+        },
+        "declared_count": 4,
+        "entries": [
+          {
+            "addresses": [
+              "0x100000efe",
+              "0x100000f29",
+              "0x100000f94"
+            ],
+            "detail": "3 instruction operand(s)",
+            "evidence": "operand",
+            "recovered": true,
+            "value": 8
+          },
+          {
+            "addresses": [
+              "0x100000e98"
+            ],
+            "detail": "1 instruction operand(s)",
+            "evidence": "operand",
+            "recovered": true,
+            "value": 15
+          },
+          {
+            "addresses": [
+              "0x100000f7f"
+            ],
+            "detail": "1 instruction operand(s)",
+            "evidence": "operand",
+            "recovered": true,
+            "value": 255
+          },
+          {
+            "addresses": [
+              "0x100000eb6",
+              "0x100000f44"
+            ],
+            "detail": "2 instruction operand(s)",
+            "evidence": "operand",
+            "recovered": true,
+            "value": 65535
+          }
+        ],
+        "recovered": {
+          "denominator": 4,
+          "numerator": 4,
+          "percent": 100.0,
+          "rate": 1.0
+        }
+      },
+      "crashed": false,
+      "failure": null,
+      "functions": {
+        "expected_count": 5,
+        "false_positives": [],
+        "located_wrong_start": [],
+        "missed": [],
+        "precision": {
+          "denominator": 5,
+          "numerator": 5,
+          "percent": 100.0,
+          "rate": 1.0
+        },
+        "recall": {
+          "denominator": 5,
+          "numerator": 5,
+          "percent": 100.0,
+          "rate": 1.0
+        },
+        "reported_in_scope_count": 5,
+        "reported_out_of_scope": [],
+        "reported_out_of_scope_count": 0,
+        "start_address_accuracy": {
+          "denominator": 5,
+          "numerator": 5,
+          "percent": 100.0,
+          "rate": 1.0
+        },
+        "true_positives": [
+          "0x100000e90",
+          "0x100000eb0",
+          "0x100000ee0",
+          "0x100000f10",
+          "0x100000f20"
+        ]
+      },
+      "imported": true,
+      "sample_id": "bitmask_manipulation_v1",
+      "scoring_region": [
+        {
+          "end_address": "0x100000f9f",
+          "name": "__text",
+          "start_address": "0x100000e90"
+        }
+      ],
+      "serialized": true
+    },
+    {
+      "analysis_digest": "dc18b195539325f4a89621d741ef762a2cdd868215d4e48a6d752aec6a1c5f8f",
+      "analysis_warnings": [
+        {
+          "code": "uncovered-executable-bytes",
+          "count": 1,
+          "severity": "info"
+        },
+        {
+          "code": "uninitialized-memory-block",
+          "count": 1,
+          "severity": "info"
+        }
+      ],
+      "call_edges": {
+        "expected_count": 2,
+        "false_positives": [],
+        "missed": [],
+        "precision": {
+          "denominator": 2,
+          "numerator": 2,
+          "percent": 100.0,
+          "rate": 1.0
+        },
+        "recall": {
+          "denominator": 2,
+          "numerator": 2,
+          "percent": 100.0,
+          "rate": 1.0
+        },
+        "reported_in_scope_count": 2,
+        "reported_out_of_scope_count": 0,
+        "true_positives": [
+          [
+            "0x100000f20",
+            "0x100000ea0"
+          ],
+          [
+            "0x100000f30",
+            "0x100000f20"
+          ]
+        ]
+      },
+      "constants": {
+        "by_evidence": {
+          "operand": 2,
+          "reachable-table-data": 2,
+          "referenced-data": 7,
+          "unsupported": 0
+        },
+        "declared_count": 11,
+        "entries": [
+          {
+            "addresses": [
+              "0x100000f80",
+              "0x100000fa0"
+            ],
+            "detail": "2 code-referenced data object(s)",
+            "evidence": "referenced-data",
+            "recovered": true,
+            "value": 0
+          },
+          {
+            "addresses": [
+              "0x100000fa4"
+            ],
+            "detail": "1 code-referenced data object(s)",
+            "evidence": "referenced-data",
+            "recovered": true,
+            "value": 8
+          },
+          {
+            "addresses": [
+              "0x100000fa8"
+            ],
+            "detail": "1 code-referenced data object(s)",
+            "evidence": "referenced-data",
+            "recovered": true,
+            "value": 19
+          },
+          {
+            "addresses": [
+              "0x100000f84"
+            ],
+            "detail": "1 code-referenced data object(s)",
+            "evidence": "referenced-data",
+            "recovered": true,
+            "value": 20
+          },
+          {
+            "addresses": [
+              "0x100000fac"
+            ],
+            "detail": "1 code-referenced data object(s)",
+            "evidence": "referenced-data",
+            "recovered": true,
+            "value": 33
+          },
+          {
+            "addresses": [
+              "0x100000f88"
+            ],
+            "detail": "1 code-referenced data object(s)",
+            "evidence": "referenced-data",
+            "recovered": true,
+            "value": 40
+          },
+          {
+            "addresses": [
+              "0x100000fb0"
+            ],
+            "detail": "int32 slot in code-referenced region __const; reachable through read_bytes but named by no operand or data object",
+            "evidence": "reachable-table-data",
+            "recovered": false,
+            "value": 52
+          },
+          {
+            "addresses": [
+              "0x100000f8c"
+            ],
+            "detail": "1 code-referenced data object(s)",
+            "evidence": "referenced-data",
+            "recovered": true,
+            "value": 60
+          },
+          {
+            "addresses": [
+              "0x100000ea9",
+              "0x100000f10",
+              "0x100000f6d"
+            ],
+            "detail": "3 instruction operand(s)",
+            "evidence": "operand",
+            "recovered": true,
+            "value": 75
+          },
+          {
+            "addresses": [
+              "0x100000f90"
+            ],
+            "detail": "int32 slot in code-referenced region __const; reachable through read_bytes but named by no operand or data object",
+            "evidence": "reachable-table-data",
+            "recovered": false,
+            "value": 80
+          },
+          {
+            "addresses": [
+              "0x100000f61"
+            ],
+            "detail": "1 instruction operand(s)",
+            "evidence": "operand",
+            "recovered": true,
+            "value": 100
+          }
+        ],
+        "recovered": {
+          "denominator": 11,
+          "numerator": 9,
+          "percent": 81.8182,
+          "rate": 0.8181818181818182
+        }
+      },
+      "crashed": false,
+      "failure": null,
+      "functions": {
+        "expected_count": 3,
+        "false_positives": [],
+        "located_wrong_start": [],
+        "missed": [],
+        "precision": {
+          "denominator": 3,
+          "numerator": 3,
+          "percent": 100.0,
+          "rate": 1.0
+        },
+        "recall": {
+          "denominator": 3,
+          "numerator": 3,
+          "percent": 100.0,
+          "rate": 1.0
+        },
+        "reported_in_scope_count": 3,
+        "reported_out_of_scope": [],
+        "reported_out_of_scope_count": 0,
+        "start_address_accuracy": {
+          "denominator": 3,
+          "numerator": 3,
+          "percent": 100.0,
+          "rate": 1.0
+        },
+        "true_positives": [
+          "0x100000ea0",
+          "0x100000f20",
+          "0x100000f30"
+        ]
+      },
+      "imported": true,
+      "sample_id": "lookup_1d_v1",
+      "scoring_region": [
+        {
+          "end_address": "0x100000f7f",
+          "name": "__text",
+          "start_address": "0x100000ea0"
+        }
+      ],
+      "serialized": true
+    },
+    {
+      "analysis_digest": "c4621e07d12d2a6eb711c61ffeb258a5b21f520ae540727f119672c8129297f9",
+      "analysis_warnings": [
+        {
+          "code": "uncovered-executable-bytes",
+          "count": 1,
+          "severity": "info"
+        },
+        {
+          "code": "uninitialized-memory-block",
+          "count": 1,
+          "severity": "info"
+        }
+      ],
+      "call_edges": {
+        "expected_count": 3,
+        "false_positives": [],
+        "missed": [],
+        "precision": {
+          "denominator": 3,
+          "numerator": 3,
+          "percent": 100.0,
+          "rate": 1.0
+        },
+        "recall": {
+          "denominator": 3,
+          "numerator": 3,
+          "percent": 100.0,
+          "rate": 1.0
+        },
+        "reported_in_scope_count": 3,
+        "reported_out_of_scope_count": 0,
+        "true_positives": [
+          [
+            "0x100000ec0",
+            "0x100000ea0"
+          ],
+          [
+            "0x100000f00",
+            "0x100000ec0"
+          ],
+          [
+            "0x100000f10",
+            "0x100000f00"
+          ]
+        ]
+      },
+      "constants": {
+        "by_evidence": {
+          "operand": 5,
+          "reachable-table-data": 8,
+          "referenced-data": 0,
+          "unsupported": 0
+        },
+        "declared_count": 13,
+        "entries": [
+          {
+            "addresses": [
+              "0x100000ec9",
+              "0x100000f29",
+              "0x100000f33",
+              "0x100000f59"
+            ],
+            "detail": "4 instruction operand(s)",
+            "evidence": "operand",
+            "recovered": true,
+            "value": 2
+          },
+          {
+            "addresses": [
+              "0x100000ed8"
+            ],
+            "detail": "1 instruction operand(s)",
+            "evidence": "operand",
+            "recovered": true,
+            "value": 3
+          },
+          {
+            "addresses": [
+              "0x100000f24"
+            ],
+            "detail": "1 instruction operand(s)",
+            "evidence": "operand",
+            "recovered": true,
+            "value": 10
+          },
+          {
+            "addresses": [
+              "0x100000f74"
+            ],
+            "detail": "int32 slot in code-referenced region __const; reachable through read_bytes but named by no operand or data object",
+            "evidence": "reachable-table-data",
+            "recovered": false,
+            "value": 12
+          },
+          {
+            "addresses": [
+              "0x100000f80"
+            ],
+            "detail": "int32 slot in code-referenced region __const; reachable through read_bytes but named by no operand or data object",
+            "evidence": "reachable-table-data",
+            "recovered": false,
+            "value": 14
+          },
+          {
+            "addresses": [
+              "0x100000f78"
+            ],
+            "detail": "int32 slot in code-referenced region __const; reachable through read_bytes but named by no operand or data object",
+            "evidence": "reachable-table-data",
+            "recovered": false,
+            "value": 15
+          },
+          {
+            "addresses": [
+              "0x100000f7c",
+              "0x100000f84"
+            ],
+            "detail": "int32 slot in code-referenced region __const; reachable through read_bytes but named by no operand or data object",
+            "evidence": "reachable-table-data",
+            "recovered": false,
+            "value": 18
+          },
+          {
+            "addresses": [
+              "0x100000f90"
+            ],
+            "detail": "int32 slot in code-referenced region __const; reachable through read_bytes but named by no operand or data object",
+            "evidence": "reachable-table-data",
+            "recovered": false,
+            "value": 19
+          },
+          {
+            "addresses": [
+              "0x100000f3d"
+            ],
+            "detail": "1 instruction operand(s)",
+            "evidence": "operand",
+            "recovered": true,
+            "value": 22
+          },
+          {
+            "addresses": [
+              "0x100000f94"
+            ],
+            "detail": "int32 slot in code-referenced region __const; reachable through read_bytes but named by no operand or data object",
+            "evidence": "reachable-table-data",
+            "recovered": false,
+            "value": 24
+          },
+          {
+            "addresses": [
+              "0x100000f8c"
+            ],
+            "detail": "int32 slot in code-referenced region __const; reachable through read_bytes but named by no operand or data object",
+            "evidence": "reachable-table-data",
+            "recovered": false,
+            "value": 26
+          },
+          {
+            "addresses": [
+              "0x100000f98"
+            ],
+            "detail": "int32 slot in code-referenced region __const; reachable through read_bytes but named by no operand or data object",
+            "evidence": "reachable-table-data",
+            "recovered": false,
+            "value": 30
+          },
+          {
+            "addresses": [
+              "0x100000f53"
+            ],
+            "detail": "1 instruction operand(s)",
+            "evidence": "operand",
+            "recovered": true,
+            "value": 36
+          }
+        ],
+        "recovered": {
+          "denominator": 13,
+          "numerator": 5,
+          "percent": 38.4615,
+          "rate": 0.38461538461538464
+        }
+      },
+      "crashed": false,
+      "failure": null,
+      "functions": {
+        "expected_count": 4,
+        "false_positives": [],
+        "located_wrong_start": [],
+        "missed": [],
+        "precision": {
+          "denominator": 4,
+          "numerator": 4,
+          "percent": 100.0,
+          "rate": 1.0
+        },
+        "recall": {
+          "denominator": 4,
+          "numerator": 4,
+          "percent": 100.0,
+          "rate": 1.0
+        },
+        "reported_in_scope_count": 4,
+        "reported_out_of_scope": [],
+        "reported_out_of_scope_count": 0,
+        "start_address_accuracy": {
+          "denominator": 4,
+          "numerator": 4,
+          "percent": 100.0,
+          "rate": 1.0
+        },
+        "true_positives": [
+          "0x100000ea0",
+          "0x100000ec0",
+          "0x100000f00",
+          "0x100000f10"
+        ]
+      },
+      "imported": true,
+      "sample_id": "lookup_2d_v1",
+      "scoring_region": [
+        {
+          "end_address": "0x100000f6f",
+          "name": "__text",
+          "start_address": "0x100000ea0"
+        }
+      ],
+      "serialized": true
+    },
+    {
+      "analysis_digest": "a6e9ccabc44eb80ef61ad8ba3a80bb87daaca6bf5bdc7c12ecf460b97798edef",
+      "analysis_warnings": [
+        {
+          "code": "uncovered-executable-bytes",
+          "count": 1,
+          "severity": "info"
+        },
+        {
+          "code": "uninitialized-memory-block",
+          "count": 1,
+          "severity": "info"
+        }
+      ],
+      "call_edges": {
+        "expected_count": 5,
+        "false_positives": [],
+        "missed": [],
+        "precision": {
+          "denominator": 5,
+          "numerator": 5,
+          "percent": 100.0,
+          "rate": 1.0
+        },
+        "recall": {
+          "denominator": 5,
+          "numerator": 5,
+          "percent": 100.0,
+          "rate": 1.0
+        },
+        "reported_in_scope_count": 5,
+        "reported_out_of_scope_count": 0,
+        "true_positives": [
+          [
+            "0x100000f00",
+            "0x100000eb0"
+          ],
+          [
+            "0x100000f00",
+            "0x100000ec0"
+          ],
+          [
+            "0x100000f00",
+            "0x100000ee0"
+          ],
+          [
+            "0x100000f30",
+            "0x100000f00"
+          ],
+          [
+            "0x100000f40",
+            "0x100000f30"
+          ]
+        ]
+      },
+      "constants": {
+        "by_evidence": {
+          "operand": 2,
+          "reachable-table-data": 0,
+          "referenced-data": 0,
+          "unsupported": 1
+        },
+        "declared_count": 3,
+        "entries": [
+          {
+            "addresses": [],
+            "detail": "no operand, no referenced data object, and no code-referenced region slot",
+            "evidence": "unsupported",
+            "recovered": false,
+            "value": 0
+          },
+          {
+            "addresses": [
+              "0x100000f49",
+              "0x100000f6c"
+            ],
+            "detail": "2 instruction operand(s)",
+            "evidence": "operand",
+            "recovered": true,
+            "value": 100
+          },
+          {
+            "addresses": [
+              "0x100000ee4",
+              "0x100000eea",
+              "0x100000f88",
+              "0x100000f9b"
+            ],
+            "detail": "4 instruction operand(s)",
+            "evidence": "operand",
+            "recovered": true,
+            "value": 1000
+          }
+        ],
+        "recovered": {
+          "denominator": 3,
+          "numerator": 2,
+          "percent": 66.6667,
+          "rate": 0.6666666666666666
+        }
+      },
+      "crashed": false,
+      "failure": null,
+      "functions": {
+        "expected_count": 6,
+        "false_positives": [],
+        "located_wrong_start": [],
+        "missed": [],
+        "precision": {
+          "denominator": 6,
+          "numerator": 6,
+          "percent": 100.0,
+          "rate": 1.0
+        },
+        "recall": {
+          "denominator": 6,
+          "numerator": 6,
+          "percent": 100.0,
+          "rate": 1.0
+        },
+        "reported_in_scope_count": 6,
+        "reported_out_of_scope": [],
+        "reported_out_of_scope_count": 0,
+        "start_address_accuracy": {
+          "denominator": 6,
+          "numerator": 6,
+          "percent": 100.0,
+          "rate": 1.0
+        },
+        "true_positives": [
+          "0x100000eb0",
+          "0x100000ec0",
+          "0x100000ee0",
+          "0x100000f00",
+          "0x100000f30",
+          "0x100000f40"
+        ]
+      },
+      "imported": true,
+      "sample_id": "multi_function_pipeline_v1",
+      "scoring_region": [
+        {
+          "end_address": "0x100000fa7",
+          "name": "__text",
+          "start_address": "0x100000eb0"
+        }
+      ],
+      "serialized": true
+    },
+    {
+      "analysis_digest": "87f2ae43198c9c4399e8669046b5c835d3ab84c211c2bacc9330238036003494",
+      "analysis_warnings": [
+        {
+          "code": "uncovered-executable-bytes",
+          "count": 1,
+          "severity": "info"
+        },
+        {
+          "code": "uninitialized-memory-block",
+          "count": 1,
+          "severity": "info"
+        }
+      ],
+      "call_edges": {
+        "expected_count": 2,
+        "false_positives": [],
+        "missed": [],
+        "precision": {
+          "denominator": 2,
+          "numerator": 2,
+          "percent": 100.0,
+          "rate": 1.0
+        },
+        "recall": {
+          "denominator": 2,
+          "numerator": 2,
+          "percent": 100.0,
+          "rate": 1.0
+        },
+        "reported_in_scope_count": 2,
+        "reported_out_of_scope_count": 0,
+        "true_positives": [
+          [
+            "0x100000f40",
+            "0x100000f10"
+          ],
+          [
+            "0x100000f50",
+            "0x100000f40"
+          ]
+        ]
+      },
+      "constants": {
+        "by_evidence": {
+          "operand": 1,
+          "reachable-table-data": 0,
+          "referenced-data": 0,
+          "unsupported": 1
+        },
+        "declared_count": 2,
+        "entries": [
+          {
+            "addresses": [],
+            "detail": "no operand, no referenced data object, and no code-referenced region slot",
+            "evidence": "unsupported",
+            "recovered": false,
+            "value": 0
+          },
+          {
+            "addresses": [
+              "0x100000f24"
+            ],
+            "detail": "1 instruction operand(s)",
+            "evidence": "operand",
+            "recovered": true,
+            "value": 60
+          }
+        ],
+        "recovered": {
+          "denominator": 2,
+          "numerator": 1,
+          "percent": 50.0,
+          "rate": 0.5
+        }
+      },
+      "crashed": false,
+      "failure": null,
+      "functions": {
+        "expected_count": 3,
+        "false_positives": [],
+        "located_wrong_start": [],
+        "missed": [],
+        "precision": {
+          "denominator": 3,
+          "numerator": 3,
+          "percent": 100.0,
+          "rate": 1.0
+        },
+        "recall": {
+          "denominator": 3,
+          "numerator": 3,
+          "percent": 100.0,
+          "rate": 1.0
+        },
+        "reported_in_scope_count": 3,
+        "reported_out_of_scope": [],
+        "reported_out_of_scope_count": 0,
+        "start_address_accuracy": {
+          "denominator": 3,
+          "numerator": 3,
+          "percent": 100.0,
+          "rate": 1.0
+        },
+        "true_positives": [
+          "0x100000f10",
+          "0x100000f40",
+          "0x100000f50"
+        ]
+      },
+      "imported": true,
+      "sample_id": "rpm_calculation_v1",
+      "scoring_region": [
+        {
+          "end_address": "0x100000fb7",
+          "name": "__text",
+          "start_address": "0x100000f10"
+        }
+      ],
+      "serialized": true
+    },
+    {
+      "analysis_digest": "9bee39aec79de3823147d86d052730124e1f0a79a3fe3b89e20e0b947bf109e9",
+      "analysis_warnings": [
+        {
+          "code": "uncovered-executable-bytes",
+          "count": 1,
+          "severity": "info"
+        },
+        {
+          "code": "uninitialized-memory-block",
+          "count": 1,
+          "severity": "info"
+        }
+      ],
+      "call_edges": {
+        "expected_count": 2,
+        "false_positives": [],
+        "missed": [],
+        "precision": {
+          "denominator": 2,
+          "numerator": 2,
+          "percent": 100.0,
+          "rate": 1.0
+        },
+        "recall": {
+          "denominator": 2,
+          "numerator": 2,
+          "percent": 100.0,
+          "rate": 1.0
+        },
+        "reported_in_scope_count": 2,
+        "reported_out_of_scope_count": 0,
+        "true_positives": [
+          [
+            "0x100000f40",
+            "0x100000ef0"
+          ],
+          [
+            "0x100000f50",
+            "0x100000f40"
+          ]
+        ]
+      },
+      "constants": {
+        "by_evidence": {
+          "operand": 4,
+          "reachable-table-data": 0,
+          "referenced-data": 0,
+          "unsupported": 1
+        },
+        "declared_count": 5,
+        "entries": [
+          {
+            "addresses": [],
+            "detail": "no operand, no referenced data object, and no code-referenced region slot",
+            "evidence": "unsupported",
+            "recovered": false,
+            "value": 0
+          },
+          {
+            "addresses": [
+              "0x100000f07",
+              "0x100000f64",
+              "0x100000f69",
+              "0x100000f6e",
+              "0x100000f95"
+            ],
+            "detail": "5 instruction operand(s)",
+            "evidence": "operand",
+            "recovered": true,
+            "value": 1
+          },
+          {
+            "addresses": [
+              "0x100000f02",
+              "0x100000f81",
+              "0x100000f86",
+              "0x100000f8b",
+              "0x100000fa7"
+            ],
+            "detail": "5 instruction operand(s)",
+            "evidence": "operand",
+            "recovered": true,
+            "value": 2
+          },
+          {
+            "addresses": [
+              "0x100000ef4",
+              "0x100000ef9",
+              "0x100000fa1"
+            ],
+            "detail": "3 instruction operand(s)",
+            "evidence": "operand",
+            "recovered": true,
+            "value": 3
+          },
+          {
+            "addresses": [
+              "0x100000f2a"
+            ],
+            "detail": "1 instruction operand(s)",
+            "evidence": "operand",
+            "recovered": true,
+            "value": 600
+          }
+        ],
+        "recovered": {
+          "denominator": 5,
+          "numerator": 4,
+          "percent": 80.0,
+          "rate": 0.8
+        }
+      },
+      "crashed": false,
+      "failure": null,
+      "functions": {
+        "expected_count": 3,
+        "false_positives": [],
+        "located_wrong_start": [],
+        "missed": [],
+        "precision": {
+          "denominator": 3,
+          "numerator": 3,
+          "percent": 100.0,
+          "rate": 1.0
+        },
+        "recall": {
+          "denominator": 3,
+          "numerator": 3,
+          "percent": 100.0,
+          "rate": 1.0
+        },
+        "reported_in_scope_count": 3,
+        "reported_out_of_scope": [],
+        "reported_out_of_scope_count": 0,
+        "start_address_accuracy": {
+          "denominator": 3,
+          "numerator": 3,
+          "percent": 100.0,
+          "rate": 1.0
+        },
+        "true_positives": [
+          "0x100000ef0",
+          "0x100000f40",
+          "0x100000f50"
+        ]
+      },
+      "imported": true,
+      "sample_id": "state_machine_v1",
+      "scoring_region": [
+        {
+          "end_address": "0x100000fab",
+          "name": "__text",
+          "start_address": "0x100000ef0"
+        }
+      ],
+      "serialized": true
+    },
+    {
+      "analysis_digest": "116ad69926240115c737cad4c065f2358308a08f9c94650b95d28ed690ab9930",
+      "analysis_warnings": [
+        {
+          "code": "uncovered-executable-bytes",
+          "count": 1,
+          "severity": "info"
+        },
+        {
+          "code": "uninitialized-memory-block",
+          "count": 1,
+          "severity": "info"
+        }
+      ],
+      "call_edges": {
+        "expected_count": 2,
+        "false_positives": [],
+        "missed": [],
+        "precision": {
+          "denominator": 2,
+          "numerator": 2,
+          "percent": 100.0,
+          "rate": 1.0
+        },
+        "recall": {
+          "denominator": 2,
+          "numerator": 2,
+          "percent": 100.0,
+          "rate": 1.0
+        },
+        "reported_in_scope_count": 2,
+        "reported_out_of_scope_count": 0,
+        "true_positives": [
+          [
+            "0x100000f50",
+            "0x100000f40"
+          ],
+          [
+            "0x100000f60",
+            "0x100000f50"
+          ]
+        ]
+      },
+      "constants": {
+        "by_evidence": {
+          "operand": 1,
+          "reachable-table-data": 0,
+          "referenced-data": 0,
+          "unsupported": 1
+        },
+        "declared_count": 2,
+        "entries": [
+          {
+            "addresses": [],
+            "detail": "no operand, no referenced data object, and no code-referenced region slot",
+            "evidence": "unsupported",
+            "recovered": false,
+            "value": 0
+          },
+          {
+            "addresses": [
+              "0x100000f93"
+            ],
+            "detail": "1 instruction operand(s)",
+            "evidence": "operand",
+            "recovered": true,
+            "value": 1
+          }
+        ],
+        "recovered": {
+          "denominator": 2,
+          "numerator": 1,
+          "percent": 50.0,
+          "rate": 0.5
+        }
+      },
+      "crashed": false,
+      "failure": null,
+      "functions": {
+        "expected_count": 3,
+        "false_positives": [],
+        "located_wrong_start": [],
+        "missed": [],
+        "precision": {
+          "denominator": 3,
+          "numerator": 3,
+          "percent": 100.0,
+          "rate": 1.0
+        },
+        "recall": {
+          "denominator": 3,
+          "numerator": 3,
+          "percent": 100.0,
+          "rate": 1.0
+        },
+        "reported_in_scope_count": 3,
+        "reported_out_of_scope": [],
+        "reported_out_of_scope_count": 0,
+        "start_address_accuracy": {
+          "denominator": 3,
+          "numerator": 3,
+          "percent": 100.0,
+          "rate": 1.0
+        },
+        "true_positives": [
+          "0x100000f40",
+          "0x100000f50",
+          "0x100000f60"
+        ]
+      },
+      "imported": true,
+      "sample_id": "temperature_controller_v1",
+      "scoring_region": [
+        {
+          "end_address": "0x100000fb7",
+          "name": "__text",
+          "start_address": "0x100000f40"
+        }
+      ],
+      "serialized": true
+    },
+    {
+      "analysis_digest": "ac26fc403a2340e3c45accdfbc58dff946816909cca9207acbe577875efd17e2",
+      "analysis_warnings": [
+        {
+          "code": "uncovered-executable-bytes",
+          "count": 1,
+          "severity": "info"
+        },
+        {
+          "code": "uninitialized-memory-block",
+          "count": 1,
+          "severity": "info"
+        }
+      ],
+      "call_edges": {
+        "expected_count": 4,
+        "false_positives": [],
+        "missed": [],
+        "precision": {
+          "denominator": 4,
+          "numerator": 4,
+          "percent": 100.0,
+          "rate": 1.0
+        },
+        "recall": {
+          "denominator": 4,
+          "numerator": 4,
+          "percent": 100.0,
+          "rate": 1.0
+        },
+        "reported_in_scope_count": 4,
+        "reported_out_of_scope_count": 0,
+        "true_positives": [
+          [
+            "0x100000eb0",
+            "0x100000e80"
+          ],
+          [
+            "0x100000eb0",
+            "0x100000e90"
+          ],
+          [
+            "0x100000ef0",
+            "0x100000eb0"
+          ],
+          [
+            "0x100000f00",
+            "0x100000ef0"
+          ]
+        ]
+      },
+      "constants": {
+        "by_evidence": {
+          "operand": 1,
+          "reachable-table-data": 0,
+          "referenced-data": 0,
+          "unsupported": 0
+        },
+        "declared_count": 1,
+        "entries": [
+          {
+            "addresses": [
+              "0x100000edc",
+              "0x100000f5f"
+            ],
+            "detail": "2 instruction operand(s)",
+            "evidence": "operand",
+            "recovered": true,
+            "value": 3000
+          }
+        ],
+        "recovered": {
+          "denominator": 1,
+          "numerator": 1,
+          "percent": 100.0,
+          "rate": 1.0
+        }
+      },
+      "crashed": false,
+      "failure": null,
+      "functions": {
+        "expected_count": 5,
+        "false_positives": [],
+        "located_wrong_start": [],
+        "missed": [],
+        "precision": {
+          "denominator": 5,
+          "numerator": 5,
+          "percent": 100.0,
+          "rate": 1.0
+        },
+        "recall": {
+          "denominator": 5,
+          "numerator": 5,
+          "percent": 100.0,
+          "rate": 1.0
+        },
+        "reported_in_scope_count": 5,
+        "reported_out_of_scope": [],
+        "reported_out_of_scope_count": 0,
+        "start_address_accuracy": {
+          "denominator": 5,
+          "numerator": 5,
+          "percent": 100.0,
+          "rate": 1.0
+        },
+        "true_positives": [
+          "0x100000e80",
+          "0x100000e90",
+          "0x100000eb0",
+          "0x100000ef0",
+          "0x100000f00"
+        ]
+      },
+      "imported": true,
+      "sample_id": "timer_counter_v1",
+      "scoring_region": [
+        {
+          "end_address": "0x100000f9f",
+          "name": "__text",
+          "start_address": "0x100000e80"
+        }
+      ],
+      "serialized": true
+    }
+  ],
+  "gate": [
+    {
+      "comparison": "==",
+      "metric": "binary_import",
+      "observed": {
+        "denominator": 8,
+        "numerator": 8,
+        "percent": 100.0,
+        "rate": 1.0
+      },
+      "observed_count": null,
+      "passed": true,
+      "threshold": 100.0
+    },
+    {
+      "comparison": "==",
+      "metric": "serialization",
+      "observed": {
+        "denominator": 8,
+        "numerator": 8,
+        "percent": 100.0,
+        "rate": 1.0
+      },
+      "observed_count": null,
+      "passed": true,
+      "threshold": 100.0
+    },
+    {
+      "comparison": ">=",
+      "metric": "function_discovery_recall",
+      "observed": {
+        "denominator": 32,
+        "numerator": 32,
+        "percent": 100.0,
+        "rate": 1.0
+      },
+      "observed_count": null,
+      "passed": true,
+      "threshold": 95.0
+    },
+    {
+      "comparison": ">=",
+      "metric": "function_discovery_precision",
+      "observed": {
+        "denominator": 32,
+        "numerator": 32,
+        "percent": 100.0,
+        "rate": 1.0
+      },
+      "observed_count": null,
+      "passed": true,
+      "threshold": 95.0
+    },
+    {
+      "comparison": ">=",
+      "metric": "call_edge_recall",
+      "observed": {
+        "denominator": 24,
+        "numerator": 24,
+        "percent": 100.0,
+        "rate": 1.0
+      },
+      "observed_count": null,
+      "passed": true,
+      "threshold": 90.0
+    },
+    {
+      "comparison": "==",
+      "metric": "unexpected_crashes",
+      "observed": null,
+      "observed_count": 0,
+      "passed": true,
+      "threshold": 0.0
+    }
+  ],
+  "gate_passed": true,
+  "schema_version": 1
+}
