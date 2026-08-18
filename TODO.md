@@ -20,10 +20,10 @@ uv run ecu-recovery graph ready
 |---|---|---|
 | `SPEC-001` | PASSED | human-approved 2026-08-17 |
 | `REPO-001` | PASSED | audited against contract; CI added |
-| `GRAPH-001` | VERIFYING | this change: graph infrastructure |
-| `DATA-001` | UNVERIFIED-UNDER-GRAPH | 6 of 8 fixture categories exist |
-| `RESEARCH-001` | PENDING | no target matrix exists |
-| `EVIDENCE-001` | UNVERIFIED-UNDER-GRAPH | no Relationship/Evidence entity, no history |
+| `GRAPH-001` | PASSED | amendment cleared GitHub CI and merged |
+| `DATA-001` | UNVERIFIED-UNDER-GRAPH | **READY** — 6 of 8 fixture categories exist |
+| `RESEARCH-001` | PENDING | **READY** — no target matrix exists |
+| `EVIDENCE-001` | UNVERIFIED-UNDER-GRAPH | **READY** — no Relationship/Evidence entity, no history |
 | `GHIDRA-001` | UNVERIFIED-UNDER-GRAPH | adapter exists; no analysis-warnings field |
 | `EVAL-STATIC-001` | PENDING | no harness, no results artifacts |
 | `TOOLS-001` | PENDING | no bounded tool layer |
@@ -36,31 +36,37 @@ already-completed graph work. See `ADR-002`.
 ## Graph
 
 ```text
-SPEC-001 → REPO-001 → GRAPH-001 → { DATA-001, RESEARCH-001, EVIDENCE-001 }
-                                          │
-                                   DATA-001 → GHIDRA-001 → EVAL-STATIC-001
-                                          → TOOLS-001 → INTEGRATION-STATIC-001
-                                          → GATE-STATIC-MVP
+SPEC-001 → REPO-001 → GRAPH-001 ─┬─→ DATA-001 ─→ GHIDRA-001 ─→ EVAL-STATIC-001
+                                 │                                    │
+                                 ├─→ RESEARCH-001                     ▼
+                                 │                                TOOLS-001
+                                 └─→ EVIDENCE-001 ──┐                 │
+                                                    ▼                 │
+                                          INTEGRATION-STATIC-001 ◄────┘
+                                                    ↓
+                                            GATE-STATIC-MVP
 ```
 
 `GRAPH-001` owns `ecu-project.graph.yaml`, `graph/**`, `prompts/**`, and
 `artifacts/**`. Nothing else may create them. Each node's contract is in
 `prompts/<NODE-ID>.md`.
 
-## NOW
+## NOW — frontier is open, awaiting assignment
 
-- Review `GRAPH-001` and mark it `PASSED` if its acceptance conditions hold.
-  Nothing is `READY` until then: the fan-out is waiting on it.
+`DATA-001`, `RESEARCH-001`, and `EVIDENCE-001` are all `READY`. Their file
+ownership is disjoint (`samples/`+`scripts/`, `docs/research/`,
+`src/ecu_recovery/evidence/`), so up to three isolated worktrees may run them
+concurrently. None starts without an explicit assignment.
+
+Do not start `GHIDRA-001` until `DATA-001` passes.
 
 ## NEXT
 
-Once `GRAPH-001` passes, `DATA-001`, `RESEARCH-001`, and `EVIDENCE-001` become
-`READY` together — verified by `newly_ready_if_passed`, not by assertion. Their
-file ownership is disjoint, so up to three isolated worktrees may run them in
-parallel.
-
-- `DATA-001` — add the two missing fixture categories: integer/bit-mask
-  manipulation and timer-like counter logic.
+- `DATA-001` — verify existing categories, add the missing integer/bit-mask and
+  timer-like counter fixtures, preserve ground truth and reproducible builds.
+  **Ruled 2026-08-17:** this node does *not* solve the x86-64 Mach-O
+  portability question; keep it documented as a known limitation and let
+  `RESEARCH-001` inform the eventual target architecture.
 - `RESEARCH-001` — produce `docs/research/ecu-target-matrix.{md,csv}`. Recommend
   candidates only; final architecture selection is a human gate.
 - `EVIDENCE-001` — add `Relationship` and `Evidence` entities, the hypothesis

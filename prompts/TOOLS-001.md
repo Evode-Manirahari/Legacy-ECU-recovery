@@ -1,7 +1,7 @@
 # NODE: TOOLS-001
 
 **Title:** Bounded agent-facing analysis tools
-**Depends on:** `EVAL-STATIC-001`, `GHIDRA-001`
+**Depends on:** `EVAL-STATIC-001`
 **Verification:** commands
 **Retry budget:** 2
 

@@ -34,15 +34,31 @@ relationships, and expected behavior.
 
 The analysis agent must never receive source or ground truth during evaluation.
 
+## Scope, ruled 2026-08-17
+
+This node does **not** solve the x86-64 Mach-O portability question. Do this
+and only this:
+
+- verify the existing fixture categories;
+- add the missing integer/bit-mask fixture;
+- add the missing timer-like counter fixture;
+- preserve machine-readable ground truth;
+- preserve reproducible builds;
+- pass the node's tests.
+
+Keep the current x86-64 Mach-O constraint documented as a known limitation —
+including that CI cannot execute those fixtures on Linux, so they skip there.
+
+Do not redesign the fixture laboratory around a new processor architecture.
+`RESEARCH-001` will inform the eventual target-architecture decision, and
+rebuilding the laboratory before that recommendation exists would mean choosing
+twice.
+
 ## Candidate implementation to audit
 
-Six of the eight categories exist from pre-graph work. Categories 7 and 8 are
-missing. Some behavior fixtures are tied to x86-64 macOS/Mach-O, which also
-means CI cannot execute them on Linux. This node owns the decision to keep,
-extend, or make the fixture target more portable.
-
-Treat existing fixtures as candidate implementation. Audit them against all
-eight categories and implement only what is missing or incorrect.
+Six of the eight categories exist from pre-graph work; categories 7 and 8 are
+missing. Treat the existing fixtures as candidate implementation: audit them
+against the contract and implement only what is missing or incorrect.
 
 ## Acceptance
 
