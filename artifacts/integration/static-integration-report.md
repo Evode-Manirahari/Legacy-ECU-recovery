@@ -61,8 +61,6 @@ node exists to test.
 
 Observed across 2 fixtures. Each is a property of an interface rather than of a binary, so each is listed once.
 
-- `report.py` drops `HypothesisStatus`: the stored belief is `supported` at revision 2, and the rendered engineering report never says so - it labels `certainty` as "Status". A REJECTED belief renders identically to an UNTESTED one. Owning file is `src/ecu_recovery/report.py`, which no current node owns; EVIDENCE-001 pinned the same gap in `test_report_does_not_yet_render_status_or_history` because its contract forbids editing that file.
-- `report.py` drops the revision chain: the belief above changed for a recorded reason ('every cited call edge and constant resolved through the tool layer') and the report shows neither the reason nor that the belief ever moved.
 - `BinaryAnalysis.as_dict()["program"]["source_path"]` is an absolute host path. That is GHIDRA-001 behaviour and harmless in memory, but any consumer persisting it into a reproducible artifact inherits the checkout directory. EVAL-STATIC-001 already had to normalise it locally (PR #15), so the workaround lives in the consumer rather than at the source and every future consumer must remember it.
 
 ## Refused tool calls
@@ -89,14 +87,14 @@ reproduce byte for byte. Everything above this heading does.
 | Fixture | Step | Seconds |
 |---|---|---:|
 | `multi_function_pipeline_v1` | intake | 0.00 |
-| `multi_function_pipeline_v1` | ghidra-analysis | 0.03 |
-| `multi_function_pipeline_v1` | internal-models | 0.04 |
-| `multi_function_pipeline_v1` | bounded-tools | 0.03 |
-| `multi_function_pipeline_v1` | evidence-persistence | 0.07 |
-| `multi_function_pipeline_v1` | evaluation | 0.82 |
+| `multi_function_pipeline_v1` | ghidra-analysis | 0.04 |
+| `multi_function_pipeline_v1` | internal-models | 0.05 |
+| `multi_function_pipeline_v1` | bounded-tools | 0.04 |
+| `multi_function_pipeline_v1` | evidence-persistence | 0.08 |
+| `multi_function_pipeline_v1` | evaluation | 0.90 |
 | `lookup_1d_v1` | intake | 0.00 |
 | `lookup_1d_v1` | ghidra-analysis | 0.00 |
 | `lookup_1d_v1` | internal-models | 0.00 |
-| `lookup_1d_v1` | bounded-tools | 0.01 |
-| `lookup_1d_v1` | evidence-persistence | 0.05 |
-| `lookup_1d_v1` | evaluation | 0.57 |
+| `lookup_1d_v1` | bounded-tools | 0.02 |
+| `lookup_1d_v1` | evidence-persistence | 0.08 |
+| `lookup_1d_v1` | evaluation | 0.86 |
