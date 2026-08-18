@@ -29,7 +29,7 @@ uv run ecu-recovery graph ready
 | `TOOLS-001` | PASSED | verified after PR #18; ten bounded, schema-checked tools |
 | `INTEGRATION-STATIC-001` | PASSED | verified after PR #20; end-to-end flow proven, three findings reported |
 | `REPORT-001` | PASSED | verified after PR #23; report distinguishes belief from testing |
-| `GATE-STATIC-MVP` | PENDING | **READY** — every prerequisite has passed |
+| `GATE-STATIC-MVP` | PASSED | all twelve static MVP properties verified 2026-08-18 |
 
 Pre-graph code is *candidate implementation to verify and complete*, never
 already-completed graph work. See `ADR-002`.
@@ -52,23 +52,25 @@ SPEC-001 → REPO-001 → GRAPH-001 ─┬─→ DATA-001 ─→ GHIDRA-001 ─�
 `artifacts/**`. Nothing else may create them. Each node's contract is in
 `prompts/<NODE-ID>.md`.
 
-## NOW — the static gate is unblocked
+## NOW — the static MVP gate has passed
 
-`RESEARCH-001` and `GATE-STATIC-MVP` are `READY`. Every implementation node
-before the static gate has passed: fixtures, deterministic analysis, measured
-evaluation, a bounded tool surface, an append-only evidence model, a proven
-end-to-end flow, and a report that distinguishes what is believed from what has
-been tested.
+All twelve required properties verified against merged main: fixtures
+reproducible, stripped binaries present, Ghidra import 8/8, function extraction
+32/32, call extraction 24/24, serialization 8/8, evaluation executes, both
+quality thresholds met, tool schemas complete, evidence persistence enforced,
+and the full regression suite green.
 
-`GATE-STATIC-MVP` is a verification node with a retry budget of zero, and its
-worker is `verification`, not `coding-agent`. Firing it is a human decision. The
-reason it was previously held — the report could not tell a `REJECTED` belief
-from an `UNTESTED` one — is now resolved by `REPORT-001`.
+`RESEARCH-001` is the only `READY` node. The investigator-agent phase is
+unlocked by the gate but **not authorized**: `AGENT-001`, `HYPOTHESIS-001`,
+`EVAL-AGENT-001`, and `GATE-AGENT-MVP` do not exist in this graph and need an
+amendment before any of them can start. `MASTER_SPEC` names `REPORT-001` in that
+unlock list, but that id now belongs to the report repair, so the agent-phase
+reporting node needs a different one.
 
-One finding remains open and is not a gate prerequisite:
-`BinaryAnalysis.program.source_path` carries an absolute host path, which every
-consumer that persists it must normalise. `EVAL-STATIC-001` already does so
-locally.
+Two things remain open and neither blocked the gate:
+`BinaryAnalysis.program.source_path` carries an absolute host path that every
+consumer persisting it must normalise, and the fixture corpus only executes on
+x86-64 macOS, so CI skips its behavioural checks.
 
 ## NEXT
 

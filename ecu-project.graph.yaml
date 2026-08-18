@@ -323,11 +323,23 @@ nodes:
     depends_on:
       - INTEGRATION-STATIC-001
       - REPORT-001
-    status: PENDING
+    status: PASSED
     worker: verification
     prompt: prompts/GATE-STATIC-MVP.md
     allowed_paths: []
     verification:
       type: gate
     retry_budget: 0
-    note: Blocks all investigator-agent work until it passes.
+    # Run 2026-08-18 against merged main. All twelve required properties were
+    # verified from live evidence rather than from earlier reports: fixture
+    # artifact hashes re-checked against build.json, the evaluation re-run into
+    # a fresh directory, the tool catalogue inspected, and evidence persistence
+    # exercised including its append-only and tamper-resistance guards. Full
+    # regression 556 passed with ruff, format, and mypy clean.
+    #
+    # The investigator-agent phase is unlocked but not authorized: AGENT-001,
+    # HYPOTHESIS-001, EVAL-AGENT-001, and GATE-AGENT-MVP do not exist in this
+    # graph yet and need their own amendment. Note that MASTER_SPEC's unlock
+    # list names REPORT-001 for the agent-phase reporting node; that id is now
+    # taken by the report repair, so the agent-phase node needs a different one.
+    note: Passed 2026-08-18; all twelve static MVP properties verified.
