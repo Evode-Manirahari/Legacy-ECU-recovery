@@ -91,6 +91,45 @@ Never for this node. Each gap is closed by its owning node.
 
 ---
 
+## ADR-004 — Select MPC5xx / 32-bit big-endian PowerPC as the first target architecture
+
+**Date:** 2026-08-18
+**Status:** accepted (human gate)
+
+**Decision:**
+The first real-world target architecture is MPC5xx, 32-bit big-endian PowerPC.
+`RESEARCH-001` recommended candidates; this entry records the human selection
+that its contract reserved. SH-2 remains the second candidate and TriCore
+remains a later, commercially important target.
+
+This authorizes architecture selection only. It does not authorize obtaining
+proprietary firmware, working on real vehicle hardware, flashing, or emulation
+before its own phase.
+
+**Reason:**
+Genuine legacy automotive relevance, mature Ghidra support, a practical GCC
+toolchain, and working QEMU and Unicorn paths for later behavioural validation.
+Emulator availability was the sharpest divider in the candidate matrix, and it
+decides whether `EMU-001` is one problem or two. MPC5xx is also a plausible
+route to symbolic execution later, and is difficult enough to test the product
+thesis without being the hardest thing available.
+
+**Alternative:**
+SH-2, which has the best public reverse-engineering material of any candidate;
+or TriCore, which has the highest commercial relevance.
+
+**Why rejected:**
+SH-2 has no usable emulator - neither Unicorn nor QEMU covers bare-metal SH-2 -
+so choosing it would mean solving behavioural validation separately. TriCore
+combines protected flash, high peripheral complexity, partly-NDA documentation,
+and no emulator: four research problems at once, which is the wrong shape for a
+first experiment. Both remain ranked candidates rather than discarded ones.
+
+**Revisit when:**
+A legally held MPC5xx example proves unobtainable, the toolchain turns out not
+to reproduce period-representative binaries, or measurement shows the
+architecture is not exercising the parts of the thesis it was chosen to test.
+
 # Part 2 — Historical entries (pre-graph process)
 
 These entries predate `ADR-001`. They are retained unedited. Their technical

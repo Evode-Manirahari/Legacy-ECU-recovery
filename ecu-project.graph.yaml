@@ -112,7 +112,7 @@ nodes:
     title: First ECU architecture research
     depends_on:
       - GRAPH-001
-    status: PENDING
+    status: PASSED
     worker: research-agent
     prompt: prompts/RESEARCH-001.md
     allowed_paths:
@@ -120,7 +120,14 @@ nodes:
     verification:
       type: human
     retry_budget: 2
-    note: Recommends candidates only. Target selection is a human gate.
+    # Human gate cleared 2026-08-18. The node recommended candidates and did not
+    # select, which is what its contract required; the selection is recorded in
+    # DECISIONS.md as ADR-004: MPC5xx, 32-bit big-endian PowerPC. Emulator
+    # availability decided it - SH-2 has the better public material but no
+    # usable emulator, and TriCore combines four research problems at once.
+    # Architecture selection only: no firmware, hardware, flashing, or emulation
+    # is authorized by it.
+    note: Passed 2026-08-18 at the human gate; ADR-004 selects MPC5xx PowerPC.
 
   EVIDENCE-001:
     title: Epistemic evidence data model

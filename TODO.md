@@ -22,7 +22,7 @@ uv run ecu-recovery graph ready
 | `REPO-001` | PASSED | audited against contract; CI added |
 | `GRAPH-001` | PASSED | amendment cleared GitHub CI and merged |
 | `DATA-001` | PASSED | verified after PR #6; all eight fixture categories present |
-| `RESEARCH-001` | PENDING | **READY** — no target matrix exists |
+| `RESEARCH-001` | PASSED | human gate cleared; ADR-004 selects MPC5xx PowerPC |
 | `EVIDENCE-001` | PASSED | verified after PR #8 and #14; append-only belief history holds under audit |
 | `GHIDRA-001` | PASSED | verified after PR #11; contract satisfied, eight fixtures structurally exact |
 | `EVAL-STATIC-001` | PASSED | verified after PR #13 and #15; static gate passes on all six thresholds |
@@ -52,25 +52,17 @@ SPEC-001 → REPO-001 → GRAPH-001 ─┬─→ DATA-001 ─→ GHIDRA-001 ─�
 `artifacts/**`. Nothing else may create them. Each node's contract is in
 `prompts/<NODE-ID>.md`.
 
-## NOW — the static MVP gate has passed
+## NOW — static MVP passed, first target selected
 
-All twelve required properties verified against merged main: fixtures
-reproducible, stripped binaries present, Ghidra import 8/8, function extraction
-32/32, call extraction 24/24, serialization 8/8, evaluation executes, both
-quality thresholds met, tool schemas complete, evidence persistence enforced,
-and the full regression suite green.
+Every node in the static phase has passed, and the human gate on `RESEARCH-001`
+is cleared: `ADR-004` selects **MPC5xx, 32-bit big-endian PowerPC** as the first
+target architecture. That authorizes architecture selection only — no firmware,
+no hardware, no flashing, no emulation.
 
-`RESEARCH-001` is the only `READY` node. The investigator-agent phase is
-unlocked by the gate but **not authorized**: `AGENT-001`, `HYPOTHESIS-001`,
-`EVAL-AGENT-001`, and `GATE-AGENT-MVP` do not exist in this graph and need an
-amendment before any of them can start. `MASTER_SPEC` names `REPORT-001` in that
-unlock list, but that id now belongs to the report repair, so the agent-phase
-reporting node needs a different one.
-
-Two things remain open and neither blocked the gate:
-`BinaryAnalysis.program.source_path` carries an absolute host path that every
-consumer persisting it must normalise, and the fixture corpus only executes on
-x86-64 macOS, so CI skips its behavioural checks.
+Nothing is `READY`. The investigator-agent phase needs a graph amendment before
+any of it can start, and the MPC5xx dataset work is a separate measurable step
+that should not be combined with first-agent evaluation: running both at once
+makes a failure impossible to attribute.
 
 ## NEXT
 
