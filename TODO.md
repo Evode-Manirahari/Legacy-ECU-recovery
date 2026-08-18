@@ -27,8 +27,8 @@ uv run ecu-recovery graph ready
 | `GHIDRA-001` | PASSED | verified after PR #11; contract satisfied, eight fixtures structurally exact |
 | `EVAL-STATIC-001` | PASSED | verified after PR #13 and #15; static gate passes on all six thresholds |
 | `TOOLS-001` | PASSED | verified after PR #18; ten bounded, schema-checked tools |
-| `INTEGRATION-STATIC-001` | PENDING | **READY** — no end-to-end controlled flow |
-| `GATE-STATIC-MVP` | PENDING | blocks all agent work |
+| `INTEGRATION-STATIC-001` | PASSED | verified after PR #20; end-to-end flow proven, three findings reported |
+| `GATE-STATIC-MVP` | PENDING | **READY** — held by human decision pending a report repair |
 
 Pre-graph code is *candidate implementation to verify and complete*, never
 already-completed graph work. See `ADR-002`.
@@ -53,18 +53,27 @@ SPEC-001 → REPO-001 → GRAPH-001 ─┬─→ DATA-001 ─→ GHIDRA-001 ─�
 
 ## NOW — frontier is open, awaiting assignment
 
-`RESEARCH-001` and `INTEGRATION-STATIC-001` are `READY`. `TOOLS-001` passing
-was the last edge into `INTEGRATION-STATIC-001`, which is the final node before
-`GATE-STATIC-MVP`. Their file ownership is disjoint (`docs/research/`,
-`artifacts/integration/` plus `tests/integration/`), so both may run in isolated
-worktrees concurrently. None starts without an explicit assignment.
+`RESEARCH-001` and `GATE-STATIC-MVP` are `READY`. Every implementation node
+before the static gate has now passed.
+
+`GATE-STATIC-MVP` is **held by human decision** rather than run. The integration
+review requires a bounded repair to `src/ecu_recovery/report.py` first: the
+human-facing report conflates `Certainty` with `HypothesisStatus` and drops
+belief revision and `change_reason` history, so a `REJECTED` belief currently
+renders identically to an `UNTESTED` one. `INTEGRATION-STATIC-001` reported that
+rather than patching it, because the file belongs to no node. Running the gate
+before the repair would certify a report that cannot say whether a belief
+survived testing.
+
+That repair node has not been created. Nothing starts without an explicit
+assignment.
 
 ## NEXT
 
 - `RESEARCH-001` — produce `docs/research/ecu-target-matrix.{md,csv}`. Recommend
   candidates only; final architecture selection is a human gate.
-- `INTEGRATION-STATIC-001` — end-to-end controlled flow plus full regression.
-- `GATE-STATIC-MVP` — verification node.
+- `GATE-STATIC-MVP` — verification node. Graph-ready, held by human decision
+  until the `report.py` status/history repair lands.
 
 After `GRAPH-001`, the `DATA-001` / `RESEARCH-001` / `EVIDENCE-001` fan-out may
 run in parallel worktrees because their file ownership is disjoint
