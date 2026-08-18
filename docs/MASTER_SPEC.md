@@ -1099,8 +1099,14 @@ artifacts/evals/static-report.md
 Dependency:
 
 ```text
-GHIDRA-001
+EVAL-STATIC-001
 ```
+
+Canonical as of 2026-08-17. An earlier revision of this section named
+`GHIDRA-001`, which conflicted with Appendix A. The resolution is
+`EVAL-STATIC-001` alone: deterministic analysis must be *measured* before it is
+exposed through the agent-facing tool layer, and `EVAL-STATIC-001` already
+depends on `GHIDRA-001`, so a direct edge would be redundant.
 
 Initial tools:
 

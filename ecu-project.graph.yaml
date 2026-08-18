@@ -64,7 +64,7 @@ nodes:
     title: Development graph infrastructure
     depends_on:
       - REPO-001
-    status: VERIFYING
+    status: PASSED
     worker: coding-agent
     prompt: prompts/GRAPH-001.md
     allowed_paths:
@@ -83,6 +83,7 @@ nodes:
         - uv run ruff format --check .
         - uv run mypy
     retry_budget: 2
+    note: Passed 2026-08-17 after its amendment cleared GitHub CI and merged.
 
   DATA-001:
     title: Synthetic firmware laboratory
@@ -175,11 +176,11 @@ nodes:
 
   TOOLS-001:
     title: Bounded agent-facing analysis tools
-    # Appendix A requires EVAL-STATIC-001. Section 26 states GHIDRA-001. Both
-    # are encoded; GHIDRA-001 is already transitive through EVAL-STATIC-001.
+    # Canonical, ruled 2026-08-17: EVAL-STATIC-001 only. GHIDRA-001 is already
+    # transitive through it, and deterministic analysis must be measured before
+    # it is exposed through the agent-facing tool layer.
     depends_on:
       - EVAL-STATIC-001
-      - GHIDRA-001
     status: PENDING
     worker: coding-agent
     prompt: prompts/TOOLS-001.md
