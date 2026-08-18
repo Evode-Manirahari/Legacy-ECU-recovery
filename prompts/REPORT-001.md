@@ -19,15 +19,27 @@ is the one thing this project exists to communicate.
 ## Ownership
 
 Allowed: `src/ecu_recovery/report.py`, `tests/report/**`,
-`tests/test_store_report.py`.
+`tests/test_store_report.py`, `tests/integration/**`,
+`artifacts/integration/**`.
 
-`tests/test_store_report.py` belongs to `EVIDENCE-001` and is included for one
-specific reason: `test_report_does_not_yet_render_status_or_history` deliberately
-pins the broken behaviour, asserting the report says `- Status: **inferred**` and
-contains neither `supported` nor the change reason. `EVIDENCE-001` wrote it that
-way because its contract forbade editing `report.py`. Every one of those
-assertions inverts when this node lands. Update that one test to assert the
-corrected behaviour; do not touch anything else in the file.
+The three paths beyond `report.py` and its own tests are all there for the same
+reason: they pin the broken behaviour on purpose, and fixing it inverts them.
+
+`tests/test_store_report.py` belongs to `EVIDENCE-001` and holds
+`test_report_does_not_yet_render_status_or_history`, which asserts the report
+says `- Status: **inferred**` and contains neither `supported` nor the change
+reason. `EVIDENCE-001` wrote it that way because its contract forbade editing
+`report.py`.
+
+`tests/integration/**` and `artifacts/integration/**` belong to
+`INTEGRATION-STATIC-001` and hold its finding that the gap exists, plus the
+recorded report listing it. That node wrote its findings as auto-detected checks
+precisely so a fix would retire them, and it does — the flow reports one finding
+instead of three once this node lands. Only the assertion pinning the gap's
+presence and the committed artifact need updating.
+
+In all three cases: update what the fix invalidates and nothing else. Do not
+weaken an unrelated assertion to make a suite go green.
 
 Forbidden: `src/ecu_recovery/store.py`, the evidence schema and models,
 `src/ecu_recovery/analysis/**`, `src/ecu_recovery/tools/**`,

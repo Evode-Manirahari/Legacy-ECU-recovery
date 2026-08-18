@@ -274,18 +274,31 @@ nodes:
     status: PENDING
     worker: coding-agent
     prompt: prompts/REPORT-001.md
-    # tests/test_store_report.py is included for one reason: it currently pins
-    # the broken behaviour on purpose, asserting that the report says
-    # "Status: **inferred**" and contains neither the status nor the change
-    # reason. EVIDENCE-001 wrote it that way because it could not fix report.py
-    # itself. Every one of those assertions inverts when this node lands, so
-    # without ownership of that file the node cannot pass `uv run pytest`. The
-    # overlap with EVIDENCE-001 is safe: REPORT-001 is transitively downstream
-    # of it, so the two can never run concurrently.
+    # Three paths beyond report.py itself, all for the same reason: they pin the
+    # broken behaviour on purpose, and fixing it inverts them.
+    #
+    # tests/test_store_report.py holds EVIDENCE-001's
+    # test_report_does_not_yet_render_status_or_history, which asserts the
+    # report says "Status: **inferred**" and contains neither the status nor the
+    # change reason.
+    #
+    # tests/integration/** and artifacts/integration/** hold
+    # INTEGRATION-STATIC-001's finding that the gap exists, plus the recorded
+    # report listing it. That node wrote its findings as auto-detected checks
+    # precisely so a fix would retire them, and it does: the flow now reports
+    # one finding instead of three. Only the assertion pinning the gap's
+    # presence and the committed artifact need updating. Amended 2026-08-18,
+    # after implementation showed the first amendment had missed them.
+    #
+    # Both overlaps are safe: REPORT-001 is transitively downstream of
+    # EVIDENCE-001 and directly downstream of INTEGRATION-STATIC-001, so it can
+    # never run concurrently with either.
     allowed_paths:
       - src/ecu_recovery/report.py
       - tests/report/**
       - tests/test_store_report.py
+      - tests/integration/**
+      - artifacts/integration/**
     verification:
       type: commands
       commands:
