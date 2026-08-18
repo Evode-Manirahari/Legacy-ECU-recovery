@@ -23,7 +23,7 @@ uv run ecu-recovery graph ready
 | `GRAPH-001` | PASSED | amendment cleared GitHub CI and merged |
 | `DATA-001` | PASSED | verified after PR #6; all eight fixture categories present |
 | `RESEARCH-001` | PENDING | **READY** — no target matrix exists |
-| `EVIDENCE-001` | UNVERIFIED-UNDER-GRAPH | **READY** — no Relationship/Evidence entity, no history |
+| `EVIDENCE-001` | PASSED | verified after PR #8 and #14; append-only belief history holds under audit |
 | `GHIDRA-001` | PASSED | verified after PR #11; contract satisfied, eight fixtures structurally exact |
 | `EVAL-STATIC-001` | PASSED | verified after PR #13 and #15; static gate passes on all six thresholds |
 | `TOOLS-001` | PENDING | **READY** — no bounded tool layer |
@@ -53,20 +53,16 @@ SPEC-001 → REPO-001 → GRAPH-001 ─┬─→ DATA-001 ─→ GHIDRA-001 ─�
 
 ## NOW — frontier is open, awaiting assignment
 
-`RESEARCH-001`, `EVIDENCE-001`, and `TOOLS-001` are all `READY`.
-`EVAL-STATIC-001` passing is what made `TOOLS-001` graph-eligible; that is the
-only thing that changed. Their file ownership is disjoint (`docs/research/`,
-`src/ecu_recovery/evidence/`, `src/ecu_recovery/tools/`), so up to three
-isolated worktrees may run them concurrently. None starts without an explicit
-assignment.
+`RESEARCH-001` and `TOOLS-001` are `READY`. `EVIDENCE-001` passing removes it
+from the frontier and leaves `INTEGRATION-STATIC-001` waiting only on
+`TOOLS-001`. Their file ownership is disjoint (`docs/research/`,
+`src/ecu_recovery/tools/`), so both may run in isolated worktrees
+concurrently. None starts without an explicit assignment.
 
 ## NEXT
 
 - `RESEARCH-001` — produce `docs/research/ecu-target-matrix.{md,csv}`. Recommend
   candidates only; final architecture selection is a human gate.
-- `EVIDENCE-001` — add `Relationship` and `Evidence` entities, the hypothesis
-  status enum (`UNTESTED`, `SUPPORTED`, `WEAKENED`, `REJECTED`, `CONFIRMED`),
-  migrations, and preserved hypothesis history.
 - `TOOLS-001` — bounded, schema-validated agent-facing tools; no LLM, no MCP.
   `EVAL-STATIC-001` measured the deterministic layer before it is exposed
   through a tool surface, which is why that edge exists.
