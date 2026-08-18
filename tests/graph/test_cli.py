@@ -12,6 +12,7 @@ import pytest
 from support import graph_text, node_block
 
 from ecu_recovery.cli import main
+from graph import load_graph
 
 
 def test_status_lists_every_node(capsys: pytest.CaptureFixture[str]) -> None:
@@ -22,7 +23,10 @@ def test_status_lists_every_node(capsys: pytest.CaptureFixture[str]) -> None:
     assert "SPEC-001" in output
     assert "PASSED" in output
     assert "GATE-STATIC-MVP" in output
-    assert len(output.strip().splitlines()) == 11
+    # Counted from the graph rather than hard-coded: a magic number here breaks
+    # every time a node is legitimately added, which teaches people to edit the
+    # assertion instead of reading it.
+    assert len(output.strip().splitlines()) == len(load_graph())
 
 
 def test_status_explains_why_a_node_is_waiting(

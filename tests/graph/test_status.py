@@ -73,6 +73,7 @@ PRE_FAN_OUT: Mapping[str, NodeStatus] = {
     "EVAL-STATIC-001": NodeStatus.PENDING,
     "TOOLS-001": NodeStatus.PENDING,
     "INTEGRATION-STATIC-001": NodeStatus.PENDING,
+    "REPORT-001": NodeStatus.PENDING,
     "GATE-STATIC-MVP": NodeStatus.PENDING,
 }
 

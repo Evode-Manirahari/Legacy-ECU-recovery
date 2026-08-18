@@ -264,10 +264,43 @@ nodes:
     # rather than run as soon as it becomes graph-ready.
     note: Verified after PR #20; end-to-end flow proven, three findings reported.
 
-  GATE-STATIC-MVP:
-    title: Static MVP gate
+  REPORT-001:
+    title: Faithful epistemic reporting
+    # The static gate certifies the human-facing report along with everything
+    # else, so the report has to say what the evidence model actually knows
+    # before the gate runs. INTEGRATION-STATIC-001 found that it does not.
     depends_on:
       - INTEGRATION-STATIC-001
+    status: PENDING
+    worker: coding-agent
+    prompt: prompts/REPORT-001.md
+    # tests/test_store_report.py is included for one reason: it currently pins
+    # the broken behaviour on purpose, asserting that the report says
+    # "Status: **inferred**" and contains neither the status nor the change
+    # reason. EVIDENCE-001 wrote it that way because it could not fix report.py
+    # itself. Every one of those assertions inverts when this node lands, so
+    # without ownership of that file the node cannot pass `uv run pytest`. The
+    # overlap with EVIDENCE-001 is safe: REPORT-001 is transitively downstream
+    # of it, so the two can never run concurrently.
+    allowed_paths:
+      - src/ecu_recovery/report.py
+      - tests/report/**
+      - tests/test_store_report.py
+    verification:
+      type: commands
+      commands:
+        - uv run pytest
+    retry_budget: 2
+
+  GATE-STATIC-MVP:
+    title: Static MVP gate
+    # REPORT-001 added 2026-08-18. The gate certifies the static MVP, and the
+    # engineering report is part of what it certifies; a report that cannot
+    # distinguish a REJECTED belief from an UNTESTED one is not something to
+    # certify first and repair afterwards.
+    depends_on:
+      - INTEGRATION-STATIC-001
+      - REPORT-001
     status: PENDING
     worker: verification
     prompt: prompts/GATE-STATIC-MVP.md
