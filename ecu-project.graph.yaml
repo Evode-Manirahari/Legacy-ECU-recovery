@@ -154,7 +154,7 @@ nodes:
     depends_on:
       - DATA-001
       - REPO-001
-    status: UNVERIFIED-UNDER-GRAPH
+    status: PASSED
     worker: coding-agent
     prompt: prompts/GHIDRA-001.md
     allowed_paths:
@@ -165,7 +165,12 @@ nodes:
       commands:
         - uv run pytest
     retry_budget: 2
-    note: Adapter exists from pre-graph work but exposes no analysis-warnings field.
+    # Verified against prompts/GHIDRA-001.md after PR #11: all eleven required
+    # operations and five required models are present, analysis warnings are
+    # exposed, and structural extraction is exact on all eight synthetic
+    # fixtures. Structural means function discovery and call-graph recovery
+    # only. Extraction accuracy is not measured here; that is EVAL-STATIC-001.
+    note: Verified after PR #11; contract operations, models, and warnings satisfied.
 
   EVAL-STATIC-001:
     title: Hidden-ground-truth static evaluation
