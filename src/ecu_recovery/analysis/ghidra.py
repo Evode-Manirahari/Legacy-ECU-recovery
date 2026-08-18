@@ -25,6 +25,14 @@ from .base import (
     DEFAULT_PAGE_SIZE,
     MAX_INSTRUCTIONS,
     MAX_RESULTS,
+    WARNING_AUTO_ANALYSIS_SKIPPED,
+    WARNING_COMPILER_SPEC_DECLARED,
+    WARNING_ENGINE_DIAGNOSTIC,
+    WARNING_IMAGE_BASE_OVERRIDDEN,
+    WARNING_LANGUAGE_DECLARED,
+    WARNING_NO_FUNCTIONS,
+    WARNING_UNCOVERED_CODE_BYTES,
+    WARNING_UNINITIALIZED_BLOCK,
     AnalysisError,
     EngineUnavailableError,
     InvalidRequestError,
@@ -36,6 +44,9 @@ from .base import (
     validate_read_request,
 )
 from .models import (
+    CONSTANT_KIND_DATA,
+    CONSTANT_KIND_OPERAND,
+    AnalysisWarning,
     ArchitectureConfig,
     ByteWindow,
     ConstantMatch,
@@ -48,9 +59,22 @@ from .models import (
     ProgramSummary,
     StringRecord,
     function_id_for,
+    sorted_warnings,
 )
 
 ENGINE_NAME = "ghidra"
+
+#: Ghidra records its own analysis complaints as bookmarks. Only these two
+#: types are complaints; the rest are navigational.
+_BOOKMARK_SEVERITY = {"Error": "error", "Warning": "warning"}
+
+#: A damaged image can carry thousands of identical loader complaints. Listing
+#: every one would bury the rest of the export, so they are counted instead.
+MAX_ENGINE_DIAGNOSTICS = 200
+
+#: How deep to walk into a composite data object looking for scalars. Arrays of
+#: structs are the realistic shape; anything deeper is not worth the traversal.
+_MAX_DATA_DEPTH = 4
 
 #: Homebrew and the official archive install Ghidra in different shapes. Both
 #: put the application root where `Ghidra/application.properties` is readable.
@@ -120,6 +144,7 @@ class GhidraSession(StaticAnalysisSession):
         source_path: Path,
         requested: ArchitectureConfig,
         engine_version: str,
+        analyzed: bool = True,
     ) -> None:
         self._stack = stack
         self._flat = flat
@@ -127,6 +152,11 @@ class GhidraSession(StaticAnalysisSession):
         self._listing: Any = self._program.getListing()
         self._function_manager: Any = self._program.getFunctionManager()
         self._closed = False
+        self._analyzed = analyzed
+        self._decompiler: Any = None
+        self._warnings: tuple[AnalysisWarning, ...] | None = None
+        language = self._program.getLanguage()
+        space = self._program.getAddressFactory().getDefaultAddressSpace()
         self._summary = ProgramSummary(
             source_path=str(source_path),
             program_name=str(self._program.getName()),
@@ -138,6 +168,17 @@ class GhidraSession(StaticAnalysisSession):
             engine=ENGINE_NAME,
             engine_version=engine_version,
             requested=requested,
+            processor=str(language.getProcessor()),
+            endian="big" if bool(language.isBigEndian()) else "little",
+            address_size_bits=int(space.getSize()),
+            pointer_size_bytes=int(self._program.getDefaultPointerSize()),
+            entry_points=tuple(
+                sorted(
+                    int(address.getOffset())
+                    for address in self._program.getSymbolTable().getExternalEntryPointIterator()
+                )
+            ),
+            auto_analysis_ran=analyzed,
         )
 
     @property
@@ -233,36 +274,56 @@ class GhidraSession(StaticAnalysisSession):
             truncated=truncated,
         )
 
+    def _decompiler_interface(self) -> Any:
+        """Open the decompiler once per session.
+
+        Opening a `DecompInterface` costs a program re-load inside the JVM.
+        Exporting a whole firmware image decompiles every function, so paying
+        that once instead of per call is the difference between minutes and
+        hours on a real image.
+        """
+        if self._decompiler is None:
+            from ghidra.app.decompiler import DecompInterface
+
+            interface = DecompInterface()
+            interface.openProgram(self._program)
+            self._decompiler = interface
+        return self._decompiler
+
     def decompile_function(self, function_id: str, timeout_seconds: int = 30) -> DecompilerResult:
         self._require_open()
         if timeout_seconds <= 0:
             raise InvalidRequestError("timeout_seconds must be positive")
-        from ghidra.app.decompiler import DecompInterface
         from ghidra.util.task import ConsoleTaskMonitor
 
         function = self._resolve(function_id)
         resolved_id = function_id_for(int(function.getEntryPoint().getOffset()))
-        interface = DecompInterface()
         try:
-            interface.openProgram(self._program)
-            result = interface.decompileFunction(function, timeout_seconds, ConsoleTaskMonitor())
-            message = str(result.getErrorMessage() or "").strip()
-            if not result.decompileCompleted():
-                return DecompilerResult(
-                    function_id=resolved_id,
-                    text="",
-                    success=False,
-                    warnings=(message or "decompilation did not complete",),
-                )
-            decompiled = result.getDecompiledFunction()
+            result = self._decompiler_interface().decompileFunction(
+                function, timeout_seconds, ConsoleTaskMonitor()
+            )
+        except Exception as error:  # noqa: BLE001 - a Java-side crash is a result, not a stop
             return DecompilerResult(
                 function_id=resolved_id,
-                text=str(decompiled.getC()),
-                success=True,
-                warnings=(message,) if message else (),
+                text="",
+                success=False,
+                warnings=(f"decompiler raised: {error}",),
             )
-        finally:
-            interface.dispose()
+        message = str(result.getErrorMessage() or "").strip()
+        if not result.decompileCompleted():
+            return DecompilerResult(
+                function_id=resolved_id,
+                text="",
+                success=False,
+                warnings=(message or "decompilation did not complete",),
+            )
+        decompiled = result.getDecompiledFunction()
+        return DecompilerResult(
+            function_id=resolved_id,
+            text=str(decompiled.getC()),
+            success=True,
+            warnings=(message,) if message else (),
+        )
 
     def get_callers(self, function_id: str) -> tuple[FunctionRecord, ...]:
         self._require_open()
@@ -290,8 +351,11 @@ class GhidraSession(StaticAnalysisSession):
         target = parse_address(address)
         manager = self._program.getReferenceManager()
         references: list[CrossReference] = []
+        # Collect first and truncate last. Truncating the engine's own iteration
+        # order would make the answer depend on how Ghidra happened to store the
+        # references, which is not something a caller can reason about.
         for reference in manager.getReferencesTo(self._address(target)):
-            if len(references) >= limit:
+            if len(references) >= MAX_RESULTS:
                 break
             source = int(reference.getFromAddress().getOffset())
             containing = self._function_manager.getFunctionContaining(reference.getFromAddress())
@@ -309,8 +373,8 @@ class GhidraSession(StaticAnalysisSession):
                     ),
                 )
             )
-        references.sort(key=lambda item: item.from_address)
-        return tuple(references)
+        references.sort(key=lambda item: (item.from_address, item.reference_type))
+        return tuple(references[:limit])
 
     def list_strings(
         self, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0, minimum_length: int = 4
@@ -378,19 +442,42 @@ class GhidraSession(StaticAnalysisSession):
         )
 
     def search_constant(self, value: int, limit: int = MAX_RESULTS) -> tuple[ConstantMatch, ...]:
+        """Find semantically relevant uses of `value`.
+
+        Two sources qualify. Instruction operands are the obvious one. Defined
+        data that code refers to is the other, and it is not optional: a
+        compiler puts a calibration table in `__const` and reaches it with a
+        base-register load, so every table entry would otherwise be invisible.
+
+        What is deliberately not searched is raw memory. A Mach-O header and a
+        link-edit table are dense with small integers; scanning bytes for a
+        match would report dozens of "recoveries" for a value like zero that no
+        instruction ever touches. The reference requirement is what separates
+        the two: a table entry the program reads has a reference, a coincidental
+        header field does not.
+        """
         self._require_open()
         validate_page(limit, 0)
+        matches = set(self._operand_matches(value))
+        matches.update(self._referenced_data_matches(value))
+        return tuple(sorted(matches, key=lambda item: item.sort_key)[:limit])
+
+    def _operand_matches(self, value: int) -> list[ConstantMatch]:
         from ghidra.program.model.scalar import Scalar
 
         matches: list[ConstantMatch] = []
         for instruction in self._listing.getInstructions(True):
-            if len(matches) >= limit:
+            if len(matches) >= MAX_RESULTS:
                 break
             for index in range(int(instruction.getNumOperands())):
                 for operand in instruction.getOpObjects(index):
+                    if len(matches) >= MAX_RESULTS:
+                        break
                     if not isinstance(operand, Scalar):
                         continue
-                    if int(operand.getValue()) != value:
+                    # A mask literal is emitted signed or unsigned depending on
+                    # the encoding, so 0xffff and -1 are the same operand.
+                    if value not in (int(operand.getValue()), int(operand.getUnsignedValue())):
                         continue
                     containing = self._function_manager.getFunctionContaining(
                         instruction.getAddress()
@@ -399,22 +486,250 @@ class GhidraSession(StaticAnalysisSession):
                         ConstantMatch(
                             address=int(instruction.getAddress().getOffset()),
                             value=value,
-                            operand_index=index,
-                            mnemonic=str(instruction.getMnemonicString()),
+                            kind=CONSTANT_KIND_OPERAND,
                             function_id=(
                                 None
                                 if containing is None
                                 else function_id_for(int(containing.getEntryPoint().getOffset()))
                             ),
+                            operand_index=index,
+                            mnemonic=str(instruction.getMnemonicString()),
                         )
                     )
-        return tuple(matches)
+        return matches
+
+    def _data_leaves(self, data: Any, depth: int = 0) -> list[Any]:
+        """Flatten a data object to the scalars it actually holds.
+
+        A calibration table is usually an array, so the value lives in the
+        components rather than in the array itself.
+        """
+        if depth >= _MAX_DATA_DEPTH:
+            return []
+        count = int(data.getNumComponents())
+        if count == 0:
+            return [data]
+        leaves: list[Any] = []
+        for index in range(count):
+            component = data.getComponent(index)
+            if component is not None:
+                leaves.extend(self._data_leaves(component, depth + 1))
+        return leaves
+
+    def _referenced_data_matches(self, value: int) -> list[ConstantMatch]:
+        from ghidra.program.model.scalar import Scalar
+
+        manager = self._program.getReferenceManager()
+        memory = self._program.getMemory()
+        matches: list[ConstantMatch] = []
+        for data in self._listing.getDefinedData(True):
+            if len(matches) >= MAX_RESULTS:
+                break
+            for leaf in self._data_leaves(data):
+                if len(matches) >= MAX_RESULTS:
+                    break
+                try:
+                    scalar = leaf.getValue()
+                except Exception:  # noqa: BLE001 - an undecodable object is simply not a match
+                    continue
+                if not isinstance(scalar, Scalar):
+                    continue
+                if value not in (int(scalar.getValue()), int(scalar.getUnsignedValue())):
+                    continue
+                address = leaf.getAddress()
+                sources = self._code_references_to(manager, address)
+                if not sources:
+                    continue
+                block = memory.getBlock(address)
+                containing = self._function_manager.getFunctionContaining(sources[0])
+                matches.append(
+                    ConstantMatch(
+                        address=int(address.getOffset()),
+                        value=value,
+                        kind=CONSTANT_KIND_DATA,
+                        function_id=(
+                            None
+                            if containing is None
+                            else function_id_for(int(containing.getEntryPoint().getOffset()))
+                        ),
+                        data_type=str(leaf.getDataType().getName()),
+                        block_name=None if block is None else str(block.getName()),
+                        reference_count=len(sources),
+                    )
+                )
+        return matches
+
+    def _code_references_to(self, manager: Any, address: Any) -> list[Any]:
+        """Source addresses of instructions that refer to `address`.
+
+        A reference from another data object proves nothing about the program's
+        behaviour, so only references made by decoded instructions count.
+        """
+        sources = [
+            reference.getFromAddress()
+            for reference in manager.getReferencesTo(address)
+            if self._listing.getInstructionAt(reference.getFromAddress()) is not None
+        ]
+        sources.sort(key=lambda item: int(item.getOffset()))
+        return sources
+
+    def analysis_warnings(self) -> tuple[AnalysisWarning, ...]:
+        self._require_open()
+        if self._warnings is None:
+            self._warnings = sorted_warnings(self._collect_warnings())
+        return self._warnings
+
+    def _collect_warnings(self) -> list[AnalysisWarning]:
+        warnings: list[AnalysisWarning] = []
+        requested = self._summary.requested
+        if not self._analyzed:
+            warnings.append(
+                AnalysisWarning(
+                    code=WARNING_AUTO_ANALYSIS_SKIPPED,
+                    message=(
+                        "auto-analysis was not run, so function and reference "
+                        "discovery is incomplete by construction"
+                    ),
+                )
+            )
+        if self.function_count() == 0:
+            warnings.append(
+                AnalysisWarning(
+                    code=WARNING_NO_FUNCTIONS,
+                    message="no functions were discovered; the load configuration is likely wrong",
+                    severity="error",
+                )
+            )
+        if requested.base_address is not None:
+            warnings.append(
+                AnalysisWarning(
+                    code=WARNING_IMAGE_BASE_OVERRIDDEN,
+                    message="every address below is relative to an investigator-supplied load base",
+                    severity="info",
+                    address=requested.base_address,
+                )
+            )
+        if requested.language_id is not None:
+            warnings.append(
+                AnalysisWarning(
+                    code=WARNING_LANGUAGE_DECLARED,
+                    message=(
+                        f"language {requested.language_id} was declared, not detected; "
+                        "results depend on that choice being right"
+                    ),
+                    severity="info",
+                )
+            )
+        if requested.compiler_spec_id is not None:
+            warnings.append(
+                AnalysisWarning(
+                    code=WARNING_COMPILER_SPEC_DECLARED,
+                    message=(
+                        f"compiler spec {requested.compiler_spec_id} was declared, not detected"
+                    ),
+                    severity="info",
+                )
+            )
+        warnings.extend(self._memory_warnings())
+        warnings.extend(self._coverage_warnings())
+        warnings.extend(self._engine_diagnostics())
+        return warnings
+
+    def _memory_warnings(self) -> list[AnalysisWarning]:
+        return [
+            AnalysisWarning(
+                code=WARNING_UNINITIALIZED_BLOCK,
+                message=f"block {block.name} holds no bytes, so nothing there can be read",
+                severity="info",
+                address=block.start_address,
+            )
+            for block in self.list_memory_regions()
+            if not block.initialized
+        ]
+
+    def _coverage_warnings(self) -> list[AnalysisWarning]:
+        """Executable bytes inside a code block that no function claims.
+
+        Only blocks that already hold a function are considered. A Mach-O header
+        is mapped executable but contains no code, and reporting it would turn a
+        loader detail into a permanent false alarm.
+        """
+        from ghidra.program.model.address import AddressSet
+
+        memory = self._program.getMemory()
+        covered = AddressSet()
+        code_blocks: set[str] = set()
+        for function in self._function_manager.getFunctions(True):
+            covered.add(function.getBody())
+            block = memory.getBlock(function.getEntryPoint())
+            if block is not None:
+                code_blocks.add(str(block.getName()))
+        candidate = AddressSet()
+        for block in memory.getBlocks():
+            if bool(block.isExecute()) and str(block.getName()) in code_blocks:
+                candidate.addRange(block.getStart(), block.getEnd())
+        uncovered = candidate.subtract(covered)
+        if uncovered.isEmpty():
+            return []
+        return [
+            AnalysisWarning(
+                code=WARNING_UNCOVERED_CODE_BYTES,
+                message=(
+                    f"{int(uncovered.getNumAddresses())} executable bytes belong to no function; "
+                    "they may be padding or undiscovered code"
+                ),
+                severity="info",
+                address=int(uncovered.getMinAddress().getOffset()),
+            )
+        ]
+
+    def _engine_diagnostics(self) -> list[AnalysisWarning]:
+        """Ghidra's own analysis complaints, which it files as bookmarks."""
+        manager = self._program.getBookmarkManager()
+        warnings: list[AnalysisWarning] = []
+        suppressed = 0
+        for bookmark_type in manager.getBookmarkTypes():
+            label = str(bookmark_type.getTypeString())
+            severity = _BOOKMARK_SEVERITY.get(label)
+            if severity is None:
+                continue
+            for bookmark in manager.getBookmarksIterator(label):
+                if len(warnings) >= MAX_ENGINE_DIAGNOSTICS:
+                    suppressed += 1
+                    continue
+                category = str(bookmark.getCategory() or "").strip()
+                comment = str(bookmark.getComment() or "").strip()
+                detail = " - ".join(part for part in (category, comment) if part)
+                warnings.append(
+                    AnalysisWarning(
+                        code=WARNING_ENGINE_DIAGNOSTIC,
+                        message=detail or f"ghidra reported a {label.lower()} here",
+                        severity=severity,
+                        address=int(bookmark.getAddress().getOffset()),
+                    )
+                )
+        if suppressed:
+            warnings.append(
+                AnalysisWarning(
+                    code=WARNING_ENGINE_DIAGNOSTIC,
+                    message=f"{suppressed} further engine diagnostics were not listed",
+                    severity="info",
+                )
+            )
+        return warnings
 
     def close(self) -> None:
         if self._closed:
             return
         self._closed = True
-        self._stack.close()
+        try:
+            if self._decompiler is not None:
+                self._decompiler.dispose()
+                self._decompiler = None
+        finally:
+            # The stack owns the temporary project directory. It gets closed
+            # even if the decompiler refuses to shut down cleanly.
+            self._stack.close()
 
 
 class GhidraEngine(StaticAnalysisEngine):
@@ -493,7 +808,7 @@ class GhidraEngine(StaticAnalysisEngine):
                 self._apply_image_base(program, requested.base_address)
             if analyze:
                 flat.analyzeAll(program)
-            return GhidraSession(flat, stack, source, requested, engine_version)
+            return GhidraSession(flat, stack, source, requested, engine_version, analyze)
         except AnalysisError:
             stack.close()
             raise
