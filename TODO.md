@@ -28,8 +28,8 @@ uv run ecu-recovery graph ready
 | `EVAL-STATIC-001` | PASSED | verified after PR #13 and #15; static gate passes on all six thresholds |
 | `TOOLS-001` | PASSED | verified after PR #18; ten bounded, schema-checked tools |
 | `INTEGRATION-STATIC-001` | PASSED | verified after PR #20; end-to-end flow proven, three findings reported |
-| `REPORT-001` | PENDING | **READY** — report conflates certainty with status, drops history |
-| `GATE-STATIC-MVP` | PENDING | waits on `REPORT-001` |
+| `REPORT-001` | PASSED | verified after PR #23; report distinguishes belief from testing |
+| `GATE-STATIC-MVP` | PENDING | **READY** — every prerequisite has passed |
 
 Pre-graph code is *candidate implementation to verify and complete*, never
 already-completed graph work. See `ADR-002`.
@@ -52,20 +52,23 @@ SPEC-001 → REPO-001 → GRAPH-001 ─┬─→ DATA-001 ─→ GHIDRA-001 ─�
 `artifacts/**`. Nothing else may create them. Each node's contract is in
 `prompts/<NODE-ID>.md`.
 
-## NOW — frontier is open, awaiting assignment
+## NOW — the static gate is unblocked
 
-`RESEARCH-001` and `REPORT-001` are `READY`.
+`RESEARCH-001` and `GATE-STATIC-MVP` are `READY`. Every implementation node
+before the static gate has passed: fixtures, deterministic analysis, measured
+evaluation, a bounded tool surface, an append-only evidence model, a proven
+end-to-end flow, and a report that distinguishes what is believed from what has
+been tested.
 
-`REPORT-001` is the repair `INTEGRATION-STATIC-001` asked for: the human-facing
-report conflates `Certainty` with `HypothesisStatus` and drops belief revision
-and `change_reason` history, so a `REJECTED` belief renders identically to an
-`UNTESTED` one. The gate now depends on it, which turns what was a human hold
-into a graph edge — the same decision, enforced by the tool that decides what
-may start rather than by memory.
+`GATE-STATIC-MVP` is a verification node with a retry budget of zero, and its
+worker is `verification`, not `coding-agent`. Firing it is a human decision. The
+reason it was previously held — the report could not tell a `REJECTED` belief
+from an `UNTESTED` one — is now resolved by `REPORT-001`.
 
-Their ownership is disjoint (`docs/research/`, `src/ecu_recovery/report.py` plus
-`tests/report/`), so both may run in isolated worktrees. Nothing starts without
-an explicit assignment.
+One finding remains open and is not a gate prerequisite:
+`BinaryAnalysis.program.source_path` carries an absolute host path, which every
+consumer that persists it must normalise. `EVAL-STATIC-001` already does so
+locally.
 
 ## NEXT
 
