@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "sample_id": "timer_counter_v1",
+  "title": "Timer-like counter with rollover",
+  "source": "source/timer_counter.c",
+  "probe_parameters": ["start", "ticks", "overflow_limit"],
+  "expected_functions": [
+    "advance_counter",
+    "elapsed_ticks",
+    "main",
+    "sample_probe",
+    "timer_delta"
+  ],
+  "expected_function_roles": {
+    "advance_counter": "Advances a free-running counter and wraps it into the sixteen-bit timer range.",
+    "elapsed_ticks": "Computes elapsed ticks across a rollover, reports a fixed stale threshold when the gap is too large, and otherwise clamps to a positive overflow limit.",
+    "main": "Runs embedded behavior self-tests and returns zero only when all pass.",
+    "sample_probe": "Passes all three probe inputs to the elapsed-time calculation.",
+    "timer_delta": "Returns the difference between two counter readings, correcting for a single rollover."
+  },
+  "classification_functions": [
+    "advance_counter",
+    "elapsed_ticks",
+    "timer_delta"
+  ],
+  "expected_call_edges": [
+    {"caller": "main", "callee": "sample_probe"},
+    {"caller": "sample_probe", "callee": "elapsed_ticks"},
+    {"caller": "elapsed_ticks", "callee": "advance_counter"},
+    {"caller": "elapsed_ticks", "callee": "timer_delta"}
+  ],
+  "expected_constants": [3000],
+  "constant_notes": "TIMER_MODULUS 65536 is deliberately not claimed: the compiler proves the wrap is a sixteen-bit truncation and emits movzwl with no operand, so it is unrecoverable from the code even though those bytes occur incidentally elsewhere in the image. STALE_TICKS 3000 is the one domain constant that survives as an instruction immediate.",
+  "expected_behavior": [
+    {"inputs": {"start": 1000, "ticks": 500, "overflow_limit": 0}, "output": 500},
+    {"inputs": {"start": 65000, "ticks": 1000, "overflow_limit": 0}, "output": 1000},
+    {"inputs": {"start": 100, "ticks": 5000, "overflow_limit": 1000}, "output": 3000},
+    {"inputs": {"start": 0, "ticks": 2000, "overflow_limit": 1000}, "output": 1000},
+    {"inputs": {"start": 0, "ticks": 0, "overflow_limit": 0}, "output": 0},
+    {"inputs": {"start": 65535, "ticks": 1, "overflow_limit": 0}, "output": 1}
+  ]
+}

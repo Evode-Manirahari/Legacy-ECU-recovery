@@ -4,6 +4,8 @@ import ctypes
 import hashlib
 import json
 import platform
+import re
+import struct
 import subprocess
 import sys
 from pathlib import Path
@@ -55,11 +57,87 @@ def test_sample_has_complete_ground_truth_and_artifacts(sample_id: str) -> None:
         assert file_sha256(artifact_path) == expected_hash
 
 
+#: The eight fixture categories the DATA-001 contract requires, mapped to the
+#: sample that covers each. Asserted by id so a renamed or dropped fixture fails
+#: loudly rather than silently reducing coverage.
+REQUIRED_CATEGORIES = {
+    "temperature threshold controller": "temperature_controller_v1",
+    "RPM-like calculation": "rpm_calculation_v1",
+    "one-dimensional lookup table": "lookup_1d_v1",
+    "two-dimensional lookup table": "lookup_2d_v1",
+    "state machine": "state_machine_v1",
+    "multi-function call graph": "multi_function_pipeline_v1",
+    "integer/bit-mask manipulation": "bitmask_manipulation_v1",
+    "timer-like counter logic": "timer_counter_v1",
+}
+
+
 def test_manifest_separates_investigator_artifacts_from_ground_truth() -> None:
     manifest = load_json(MANIFEST)
     assert manifest["investigator_visible"] == ["binaries/<sample_id>/firmware.stripped"]
-    assert len(manifest["samples"]) == 6
-    assert len(set(manifest["samples"])) == 6
+    assert len(manifest["samples"]) == len(set(manifest["samples"]))
+
+
+def test_every_required_fixture_category_is_present() -> None:
+    """DATA-001 requires all eight categories, not merely eight samples."""
+    declared = set(sample_ids())
+
+    missing = {
+        category: sample
+        for category, sample in REQUIRED_CATEGORIES.items()
+        if sample not in declared
+    }
+
+    assert not missing, f"missing fixture categories: {missing}"
+    assert declared == set(REQUIRED_CATEGORIES.values())
+
+
+@pytest.mark.parametrize("sample_id", sample_ids())
+def test_sample_preserves_every_contract_field(sample_id: str) -> None:
+    """The contract's 'for every fixture preserve' list, checked per sample."""
+    metadata = load_json(DATASET_ROOT / "ground_truth" / f"{sample_id}.json")
+    build = load_json(DATASET_ROOT / "binaries" / sample_id / "build.json")
+
+    assert metadata["expected_constants"], "expected constants must not be empty"
+    assert metadata["expected_call_edges"], "expected relationships must not be empty"
+    assert build["compiler"].strip(), "compiler identity must be recorded"
+    assert build["commands"]["symbols_on"], "compiler flags must be recorded"
+    assert build["source_sha256"]
+    for artifact in ("firmware.symbols", "firmware.stripped", "behavior.dylib"):
+        assert artifact in build["artifacts"], f"{artifact} must be recorded"
+
+
+def instruction_immediates(binary_path: Path) -> set[int]:
+    """Immediate operands in the disassembly, at whatever width they encode."""
+    result = subprocess.run(
+        ["otool", "-tvV", str(binary_path)], capture_output=True, check=False, text=True, timeout=30
+    )
+    return {int(match, 16) for match in re.findall(r"\$0x([0-9a-f]+)", result.stdout)}
+
+
+@pytest.mark.skipif(not ON_BUILD_HOST, reason="constant recovery inspects a Mach-O build")
+@pytest.mark.parametrize("sample_id", sample_ids())
+def test_expected_constants_are_actually_recoverable(sample_id: str) -> None:
+    """Ground truth must not claim a constant the binary does not contain.
+
+    A claimed-but-absent constant scores as a tool failure during evaluation
+    when the fault is really in the fixture. A constant is recoverable if the
+    compiler emitted it either as an instruction operand or as data: small
+    values become one-byte immediates, table entries land in `__const`, and
+    which one happens is the compiler's choice, not the fixture author's.
+    """
+    metadata = load_json(DATASET_ROOT / "ground_truth" / f"{sample_id}.json")
+    binary_path = DATASET_ROOT / "binaries" / sample_id / "firmware.symbols"
+    immediates = instruction_immediates(binary_path)
+    data = binary_path.read_bytes()
+
+    unrecoverable = [
+        value
+        for value in metadata["expected_constants"]
+        if value not in immediates and struct.pack("<i", value) not in data
+    ]
+
+    assert not unrecoverable, f"{sample_id} claims absent constants: {unrecoverable}"
 
 
 @pytest.mark.skipif(not ON_BUILD_HOST, reason="v1 behavior artifacts require x86_64 macOS")

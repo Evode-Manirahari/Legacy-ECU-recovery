@@ -18,6 +18,8 @@
     "lookup_1d_v1",
     "lookup_2d_v1",
     "state_machine_v1",
-    "multi_function_pipeline_v1"
+    "multi_function_pipeline_v1",
+    "bitmask_manipulation_v1",
+    "timer_counter_v1"
   ]
 }
