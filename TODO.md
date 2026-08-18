@@ -30,6 +30,9 @@ uv run ecu-recovery graph ready
 | `INTEGRATION-STATIC-001` | PASSED | verified after PR #20; end-to-end flow proven, three findings reported |
 | `REPORT-001` | PASSED | verified after PR #23; report distinguishes belief from testing |
 | `GATE-STATIC-MVP` | PASSED | all twelve static MVP properties verified 2026-08-18 |
+| `AGENT-001` | PENDING | **READY** — first node permitted a model |
+| `EVAL-AGENT-001` | PENDING | no agent measurement exists |
+| `GATE-AGENT-MVP` | PENDING | blocks emulation and real firmware |
 
 Pre-graph code is *candidate implementation to verify and complete*, never
 already-completed graph work. See `ADR-002`.
@@ -52,31 +55,33 @@ SPEC-001 → REPO-001 → GRAPH-001 ─┬─→ DATA-001 ─→ GHIDRA-001 ─�
 `artifacts/**`. Nothing else may create them. Each node's contract is in
 `prompts/<NODE-ID>.md`.
 
-## NOW — static MVP passed, first target selected
+## NOW — the investigator-agent phase is open
 
-Every node in the static phase has passed, and the human gate on `RESEARCH-001`
-is cleared: `ADR-004` selects **MPC5xx, 32-bit big-endian PowerPC** as the first
-target architecture. That authorizes architecture selection only — no firmware,
-no hardware, no flashing, no emulation.
+`AGENT-001` is `READY`. It is the first node permitted to use a model, and the
+division it must preserve is unchanged: tools derive facts, the model interprets
+them, experiments challenge interpretations, verification decides correctness.
 
-Nothing is `READY`. The investigator-agent phase needs a graph amendment before
-any of it can start, and the MPC5xx dataset work is a separate measurable step
-that should not be combined with first-agent evaluation: running both at once
-makes a failure impossible to attribute.
+It runs on the **synthetic corpus** through the **existing tool registry**, both
+deliberately. Introducing a model against the newly selected MPC5xx target at
+the same time would make every failure ambiguous — a wrong answer could be the
+model or the unfamiliar architecture, with no way to tell which. MPC5xx dataset
+work is a separate, later, measurable step.
+
+Three nodes were authorized, not five. `HYPOTHESIS-001` is unnecessary because
+`EVIDENCE-001` already persists hypotheses with revisions and evidence links,
+and the agent-phase reporting node `MASTER_SPEC` once named cannot reuse the
+`REPORT-001` id, so it is deferred until it is actually needed.
 
 ## NEXT
 
-- `RESEARCH-001` — produce `docs/research/ecu-target-matrix.{md,csv}`. Recommend
-  candidates only; final architecture selection is a human gate.
-- `REPORT-001` — render `Certainty` and `HypothesisStatus` as separate
-  concepts, expose the revision chain with its `change_reason`, and keep
-  current-belief semantics, evidence references, and deterministic output.
-- `GATE-STATIC-MVP` — verification node. Blocked until `REPORT-001` passes.
-
-After `GRAPH-001`, the `DATA-001` / `RESEARCH-001` / `EVIDENCE-001` fan-out may
-run in parallel worktrees because their file ownership is disjoint
-(`samples/` + `scripts/`, `docs/research/`, `src/ecu_recovery/evidence/`).
-Maximum three parallel workers. Do not parallelize work that shares a bottleneck.
+- `AGENT-001` — bounded investigator agent over the existing `ToolRegistry`,
+  producing evidence-backed explanations whose citations resolve.
+- `EVAL-AGENT-001` — measure citation validity, unsupported claims, and tool
+  hallucination against hidden ground truth. Baseline classification accuracy;
+  do not gate it before seeing it.
+- `GATE-AGENT-MVP` — verification node. Blocks emulation and real firmware.
+- MPC5xx dataset work — a separate measurable step, after first-agent
+  evaluation rather than alongside it.
 
 ## LATER
 

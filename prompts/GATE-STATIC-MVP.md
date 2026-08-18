@@ -1,7 +1,7 @@
 # NODE: GATE-STATIC-MVP
 
 **Title:** Static MVP gate
-**Depends on:** `INTEGRATION-STATIC-001`
+**Depends on:** `INTEGRATION-STATIC-001`, `REPORT-001`
 **Worker:** verification
 **Verification:** gate
 **Retry budget:** 0
