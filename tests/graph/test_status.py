@@ -75,6 +75,9 @@ PRE_FAN_OUT: Mapping[str, NodeStatus] = {
     "INTEGRATION-STATIC-001": NodeStatus.PENDING,
     "REPORT-001": NodeStatus.PENDING,
     "GATE-STATIC-MVP": NodeStatus.PENDING,
+    "AGENT-001": NodeStatus.PENDING,
+    "EVAL-AGENT-001": NodeStatus.PENDING,
+    "GATE-AGENT-MVP": NodeStatus.PENDING,
 }
 
 
@@ -165,7 +168,11 @@ def test_nothing_is_obstructed(graph: Graph) -> None:
 def test_dependency_lookups_work_in_both_directions(graph: Graph) -> None:
     assert graph.dependencies_of("GRAPH-001") == ("REPO-001",)
     assert set(graph.dependents_of("GRAPH-001")) == set(FAN_OUT)
-    assert graph.dependents_of("GATE-STATIC-MVP") == ()
+    # The static gate stopped being the end of the graph when the
+    # investigator-agent phase was authorized. The terminal node is now the
+    # agent gate, and asserting that keeps the "both directions" claim honest.
+    assert graph.dependents_of("GATE-STATIC-MVP") == ("AGENT-001",)
+    assert graph.dependents_of("GATE-AGENT-MVP") == ()
 
 
 def test_tools_001_depends_only_on_eval_static_001(graph: Graph) -> None:

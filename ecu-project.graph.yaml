@@ -350,3 +350,67 @@ nodes:
     # list names REPORT-001 for the agent-phase reporting node; that id is now
     # taken by the report repair, so the agent-phase node needs a different one.
     note: Passed 2026-08-18; all twelve static MVP properties verified.
+
+  # --- investigator-agent phase ---
+  #
+  # Authorized 2026-08-18, after GATE-STATIC-MVP passed. Three nodes, not five.
+  # MASTER_SPEC once listed HYPOTHESIS-001 and an agent-phase REPORT-001; the
+  # first is unnecessary because EVIDENCE-001 already persists hypotheses with
+  # revisions and evidence links, and the second cannot reuse that id because
+  # the epistemic REPORT-001 has taken it. A reporting node can be named and
+  # added later if it turns out to be needed.
+
+  AGENT-001:
+    title: Bounded investigator agent
+    # Deliberately on the synthetic corpus and the existing tool registry. A new
+    # architecture and a first agent at the same time would make every failure
+    # ambiguous: a wrong answer could be the model or the unfamiliar target, and
+    # there would be no way to tell which. MPC5xx data work is its own step.
+    depends_on:
+      - GATE-STATIC-MVP
+    status: PENDING
+    worker: coding-agent
+    prompt: prompts/AGENT-001.md
+    allowed_paths:
+      - src/ecu_recovery/agent/**
+      - tests/agent/**
+    verification:
+      type: commands
+      commands:
+        - uv run pytest
+    retry_budget: 2
+    note: First node permitted a model. Tools derive facts; the model interprets them.
+
+  EVAL-AGENT-001:
+    title: Deterministic agent evaluation
+    depends_on:
+      - AGENT-001
+    status: PENDING
+    worker: coding-agent
+    prompt: prompts/EVAL-AGENT-001.md
+    # Subtrees of EVAL-STATIC-001's paths. The overlap is ordered and therefore
+    # safe: this node is transitively downstream of that one, so the two can
+    # never run concurrently.
+    allowed_paths:
+      - src/ecu_recovery/evaluation/agent/**
+      - tests/evaluation/agent/**
+      - artifacts/evals/agent/**
+    verification:
+      type: commands
+      commands:
+        - uv run pytest
+    retry_budget: 2
+    note: Measures citation validity and unsupported claims, not prose quality.
+
+  GATE-AGENT-MVP:
+    title: Agent MVP gate
+    depends_on:
+      - EVAL-AGENT-001
+    status: PENDING
+    worker: verification
+    prompt: prompts/GATE-AGENT-MVP.md
+    allowed_paths: []
+    verification:
+      type: gate
+    retry_budget: 0
+    note: Blocks emulation and real-firmware work until it passes.
