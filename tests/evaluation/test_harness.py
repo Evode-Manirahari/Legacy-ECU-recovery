@@ -8,6 +8,8 @@ committed baseline is reproducible rather than a snapshot nobody can re-derive.
 from __future__ import annotations
 
 import json
+import shutil
+from pathlib import Path
 
 import pytest
 from evaluation_support import (
@@ -21,7 +23,7 @@ from evaluation_support import (
 from ecu_recovery.analysis.ghidra import GhidraEngine
 from ecu_recovery.evaluation import groundtruth as groundtruth_module
 from ecu_recovery.evaluation import harness as harness_module
-from ecu_recovery.evaluation.groundtruth import discover_sample_ids
+from ecu_recovery.evaluation.groundtruth import DEFAULT_SAMPLES_ROOT, discover_sample_ids
 from ecu_recovery.evaluation.harness import analyze_only, evaluate_fixture, freeze, frozen_session
 from ecu_recovery.evaluation.models import EVIDENCE_TABLE_DATA
 from ecu_recovery.evaluation.report import render_report
@@ -29,6 +31,7 @@ from ecu_recovery.evaluation.report import render_report
 pytestmark = [pytest.mark.ghidra, requires_ghidra]
 
 SAMPLE = "lookup_1d_v1"
+SAMPLES_ROOT = DEFAULT_SAMPLES_ROOT
 
 
 # --- the anti-leakage protocol ---
@@ -144,6 +147,23 @@ def test_the_report_is_regenerated_identically() -> None:
     from evaluation_support import RECORDED_REPORT
 
     assert render_report(live_run()) == RECORDED_REPORT.read_text(encoding="utf-8")
+
+
+def test_the_digest_does_not_depend_on_where_the_corpus_lives(tmp_path: Path) -> None:
+    """The defect this guards: the baseline only reproduced in its own checkout.
+
+    Relocating the corpus changes every absolute path and nothing about the
+    program, so the frozen digest must not move.
+    """
+    relocated = tmp_path / "synthetic"
+    shutil.copytree(SAMPLES_ROOT, relocated, symlinks=False)
+
+    here = analyze_only(GhidraEngine(), SAMPLE)
+    there = analyze_only(GhidraEngine(), SAMPLE, relocated)
+
+    assert there.digest == here.digest
+    assert there.payload["program"]["source_path"] == here.payload["program"]["source_path"]
+    assert not here.payload["program"]["source_path"].startswith("/")
 
 
 def test_reachable_table_data_sits_in_a_region_no_function_occupies() -> None:

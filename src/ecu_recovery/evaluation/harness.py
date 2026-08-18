@@ -30,6 +30,7 @@ from ..analysis.base import AnalysisError, StaticAnalysisSession
 from ..analysis.ghidra import GhidraEngine
 from .constants import classify_constants
 from .groundtruth import (
+    DEFAULT_SAMPLES_ROOT,
     GroundTruthError,
     discover_sample_ids,
     load_ground_truth,
@@ -75,9 +76,34 @@ def _serialize(payload: dict[str, Any]) -> str:
     return json.dumps(payload, sort_keys=True, separators=(",", ":"))
 
 
-def freeze(sample_id: str, session: StaticAnalysisSession) -> FrozenAnalysis:
+def corpus_relative_source(sample_id: str, samples_root: Path | None = None) -> str:
+    """Where the analyzed file sits inside the corpus, not on this disk.
+
+    `ProgramSummary.source_path` is an absolute path, so freezing it verbatim
+    would stamp the checkout directory into the payload and its digest. The
+    baseline would then only reproduce in the directory that recorded it, and
+    any second clone or worktree would report a spurious mismatch.
+
+    Absolute location is not a property of the analysis. What was analyzed is
+    already pinned by `executable_sha256`, which is content, so dropping the
+    prefix costs no provenance.
+    """
+    root = (samples_root or DEFAULT_SAMPLES_ROOT).resolve()
+    firmware = stripped_firmware(sample_id, samples_root).resolve()
+    try:
+        return firmware.relative_to(root).as_posix()
+    except ValueError:
+        # A corpus reached through a symlink or a different root: fall back to
+        # the fixture-relative shape rather than leaking an absolute path.
+        return f"binaries/{sample_id}/firmware.stripped"
+
+
+def freeze(
+    sample_id: str, session: StaticAnalysisSession, samples_root: Path | None = None
+) -> FrozenAnalysis:
     """Export, serialize, and digest. No ground truth is touched here."""
     exported = session.export().as_dict()
+    exported["program"]["source_path"] = corpus_relative_source(sample_id, samples_root)
     payload_json = _serialize(exported)
     restored = json.loads(payload_json)
     return FrozenAnalysis(
@@ -97,7 +123,7 @@ def frozen_session(
 ) -> Iterator[tuple[FrozenAnalysis, StaticAnalysisSession]]:
     firmware = stripped_firmware(sample_id, samples_root)
     with engine.analyze_binary(firmware) as session:
-        yield freeze(sample_id, session), session
+        yield freeze(sample_id, session, samples_root), session
 
 
 def analyze_only(
@@ -133,7 +159,7 @@ def evaluate_fixture(
             call_edges = score_call_edges(frozen.payload, truth, region)
             constants = classify_constants(session, frozen.payload, truth)
 
-            after = freeze(sample_id, session)
+            after = freeze(sample_id, session, samples_root)
             if after.digest != frozen.digest:
                 return FixtureResult(
                     sample_id=sample_id,

@@ -72,7 +72,7 @@ matching bytes are not evidence and are not counted anywhere below.
 ### `bitmask_manipulation_v1`
 
 Scoring region: `__text` 0x100000e90-0x100000f9f
-Analysis digest: `323f6affc4be3e4f`
+Analysis digest: `9dee182d0ab3a0b8`
 
 | Metric | Result |
 |---|---|
@@ -101,7 +101,7 @@ Analysis warnings:
 ### `lookup_1d_v1`
 
 Scoring region: `__text` 0x100000ea0-0x100000f7f
-Analysis digest: `dc18b195539325f4`
+Analysis digest: `66b2ba63c0702486`
 
 | Metric | Result |
 |---|---|
@@ -137,7 +137,7 @@ Analysis warnings:
 ### `lookup_2d_v1`
 
 Scoring region: `__text` 0x100000ea0-0x100000f6f
-Analysis digest: `c4621e07d12d2a6e`
+Analysis digest: `6581f05a4a35d841`
 
 | Metric | Result |
 |---|---|
@@ -175,7 +175,7 @@ Analysis warnings:
 ### `multi_function_pipeline_v1`
 
 Scoring region: `__text` 0x100000eb0-0x100000fa7
-Analysis digest: `a6e9ccabc44eb80e`
+Analysis digest: `24fa4947cdd7e940`
 
 | Metric | Result |
 |---|---|
@@ -203,7 +203,7 @@ Analysis warnings:
 ### `rpm_calculation_v1`
 
 Scoring region: `__text` 0x100000f10-0x100000fb7
-Analysis digest: `87f2ae43198c9c43`
+Analysis digest: `8d4b8a4460d99d8a`
 
 | Metric | Result |
 |---|---|
@@ -230,7 +230,7 @@ Analysis warnings:
 ### `state_machine_v1`
 
 Scoring region: `__text` 0x100000ef0-0x100000fab
-Analysis digest: `9bee39aec79de382`
+Analysis digest: `a6105457cf08fcc0`
 
 | Metric | Result |
 |---|---|
@@ -260,7 +260,7 @@ Analysis warnings:
 ### `temperature_controller_v1`
 
 Scoring region: `__text` 0x100000f40-0x100000fb7
-Analysis digest: `116ad69926240115`
+Analysis digest: `5e281c39b17aa3b8`
 
 | Metric | Result |
 |---|---|
@@ -287,7 +287,7 @@ Analysis warnings:
 ### `timer_counter_v1`
 
 Scoring region: `__text` 0x100000e80-0x100000f9f
-Analysis digest: `ac26fc403a2340e3`
+Analysis digest: `85b38d36296fa13a`
 
 | Metric | Result |
 |---|---|

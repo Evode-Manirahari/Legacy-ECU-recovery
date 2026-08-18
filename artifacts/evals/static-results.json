@@ -68,7 +68,7 @@
   },
   "fixtures": [
     {
-      "analysis_digest": "323f6affc4be3e4f0d7d3f12148abd4578437bbaef285579cd74a66e30113f59",
+      "analysis_digest": "9dee182d0ab3a0b8fa5fb6064b57f115b5818ded3acfe0008d41b3621d6414cb",
       "analysis_warnings": [
         {
           "code": "uncovered-executable-bytes",
@@ -222,7 +222,7 @@
       "serialized": true
     },
     {
-      "analysis_digest": "dc18b195539325f4a89621d741ef762a2cdd868215d4e48a6d752aec6a1c5f8f",
+      "analysis_digest": "66b2ba63c0702486fa51b10e4fb72faded3d378324bb6d781415911fba628be0",
       "analysis_warnings": [
         {
           "code": "uncovered-executable-bytes",
@@ -429,7 +429,7 @@
       "serialized": true
     },
     {
-      "analysis_digest": "c4621e07d12d2a6eb711c61ffeb258a5b21f520ae540727f119672c8129297f9",
+      "analysis_digest": "6581f05a4a35d84172e4a10632b284a49b5511cb5116029a4002973faa53aecb",
       "analysis_warnings": [
         {
           "code": "uncovered-executable-bytes",
@@ -660,7 +660,7 @@
       "serialized": true
     },
     {
-      "analysis_digest": "a6e9ccabc44eb80ef61ad8ba3a80bb87daaca6bf5bdc7c12ecf460b97798edef",
+      "analysis_digest": "24fa4947cdd7e9400e5d490ee93bd40479af10a011d6142c2a5e20b69f327a2b",
       "analysis_warnings": [
         {
           "code": "uncovered-executable-bytes",
@@ -809,7 +809,7 @@
       "serialized": true
     },
     {
-      "analysis_digest": "87f2ae43198c9c4399e8669046b5c835d3ab84c211c2bacc9330238036003494",
+      "analysis_digest": "8d4b8a4460d99d8a2013eeff54e9ee03c2dae362f5d46c4fdd6c117a148b7056",
       "analysis_warnings": [
         {
           "code": "uncovered-executable-bytes",
@@ -930,7 +930,7 @@
       "serialized": true
     },
     {
-      "analysis_digest": "9bee39aec79de3823147d86d052730124e1f0a79a3fe3b89e20e0b947bf109e9",
+      "analysis_digest": "a6105457cf08fcc01d22aa95d001a6a0767e2ebcaf865b1a93606dbff40a7c45",
       "analysis_warnings": [
         {
           "code": "uncovered-executable-bytes",
@@ -1088,7 +1088,7 @@
       "serialized": true
     },
     {
-      "analysis_digest": "116ad69926240115c737cad4c065f2358308a08f9c94650b95d28ed690ab9930",
+      "analysis_digest": "5e281c39b17aa3b8dcb08535f5f4e5e462075bdbc7a09ec478f58fbd74576e7b",
       "analysis_warnings": [
         {
           "code": "uncovered-executable-bytes",
@@ -1209,7 +1209,7 @@
       "serialized": true
     },
     {
-      "analysis_digest": "ac26fc403a2340e3c45accdfbc58dff946816909cca9207acbe577875efd17e2",
+      "analysis_digest": "85b38d36296fa13ab10a302100a33773b385121a28ba41b1ea986776424f47bf",
       "analysis_warnings": [
         {
           "code": "uncovered-executable-bytes",
