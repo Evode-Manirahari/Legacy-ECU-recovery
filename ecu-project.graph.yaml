@@ -214,7 +214,7 @@ nodes:
     # it is exposed through the agent-facing tool layer.
     depends_on:
       - EVAL-STATIC-001
-    status: PENDING
+    status: PASSED
     worker: coding-agent
     prompt: prompts/TOOLS-001.md
     allowed_paths:
@@ -226,6 +226,16 @@ nodes:
       commands:
         - uv run pytest
     retry_budget: 2
+    # Verified after PR #18. All ten required tools are present, inputs and
+    # outputs are schema-validated, responses are bounded with explicit
+    # pagination and truncation, errors are structured values rather than
+    # exceptions, and every result survives JSON so no engine object escapes.
+    # A tool receives an open session and nothing else, so the layer has no
+    # filesystem, shell, or network reach; bounds are imported from
+    # analysis.base rather than restated. No LLM, MCP, emulation, symbolic
+    # execution, or angr. 72 of the 83 tool tests need no Ghidra, so the
+    # layer's own guarantees stay under test in CI.
+    note: Verified after PR #18; ten bounded tools, schema-checked in both directions.
 
   INTEGRATION-STATIC-001:
     title: Static MVP integration
