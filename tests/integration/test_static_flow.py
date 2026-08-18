@@ -275,24 +275,26 @@ def test_no_absolute_path_reaches_a_delivered_artifact(flows: list[FlowResult]) 
             assert "/Users/" not in evidence.summary
 
 
-def test_the_flow_reports_the_report_status_gap(flows: list[FlowResult]) -> None:
-    """The engineering report cannot distinguish REJECTED from UNTESTED.
+def test_the_report_status_gap_is_closed(flows: list[FlowResult]) -> None:
+    """This assertion used to run the other way, and that is the point.
 
-    EVIDENCE-001 pinned the same gap and could not close it: `report.py` is
-    outside its ownership and outside this node's. Detected here rather than
-    asserted, so the finding disappears on its own once the file is fixed.
+    INTEGRATION-STATIC-001 found that the report could not distinguish REJECTED
+    from UNTESTED, and pinned the gap's presence. REPORT-001 closed it. The
+    finding was written as an auto-detected check rather than as prose, so it
+    retired itself: the flow now reports one interface finding instead of three,
+    and this test asserts the closure rather than the gap.
     """
     for flow in flows:
         assert flow.store is not None
         current = flow.store.current_hypothesis(flow.binary_id, flow.hypothesis_key)
         assert current is not None
         assert current.status is HypothesisStatus.SUPPORTED
-        assert current.status.value not in flow.rendered_report
-        assert any("HypothesisStatus" in item for item in flow.mismatches)
+        assert current.status.value in flow.rendered_report
+        assert not any("HypothesisStatus" in item for item in flow.mismatches)
 
 
 def test_interface_observations_do_not_count_as_blockers(flows: list[FlowResult]) -> None:
-    """The flow completed with both findings present; neither stops the MVP."""
+    """The flow completed with the remaining finding present; it does not stop the MVP."""
     for flow in flows:
         assert flow.mismatches, "the flow found nothing, which would be suspicious"
         assert flow.blockers == []

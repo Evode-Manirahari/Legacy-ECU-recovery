@@ -70,8 +70,13 @@ def test_report_shows_current_belief_not_superseded_ones(tmp_path: Path) -> None
     report = render_markdown(store, analysis_id)
 
     assert report.count("possible initialization routine") == 1
-    assert "20%" in report
-    assert "90%" not in report
+    assert "- Confidence: 20%" in report
+    # The superseded 90% is not gone - REPORT-001 renders it inside the belief
+    # history, which is the point of keeping history. What must never happen is
+    # it appearing as a headline belief, as though both were still held.
+    assert "- Confidence: 90%" not in report
+    assert "| 1 | inferred" not in report
+    assert "| 1 | untested | 90% |" in report
 
 
 def test_report_still_renders_a_single_hypothesis_unchanged(tmp_path: Path) -> None:
@@ -126,13 +131,14 @@ def test_structured_evidence_reaches_the_report_with_its_stance(tmp_path: Path) 
     assert "E-099 [contradicts] also on the fuel-trim path" in report
 
 
-def test_report_does_not_yet_render_status_or_history(tmp_path: Path) -> None:
-    """Records the gap this node cannot close.
+def test_report_renders_status_and_history(tmp_path: Path) -> None:
+    """The gap this test used to pin, now closed.
 
-    `report.py` belongs to another node. It labels `certainty` as "Status" and
-    never renders `HypothesisStatus`, the revision chain, or the reason a
-    belief changed. This test pins the current, limited behaviour so the
-    follow-up is visible rather than assumed.
+    It previously asserted the opposite - that the report said
+    `Status: **inferred**` and contained neither the status nor the change
+    reason - because `report.py` belonged to no node and EVIDENCE-001 could not
+    fix it. REPORT-001 was created to close exactly that, so the assertions are
+    inverted rather than deleted: the record of what was wrong stays legible.
     """
     firmware = tmp_path / "fixture.rom"
     firmware.write_bytes(bytes(range(128)))
@@ -152,6 +158,7 @@ def test_report_does_not_yet_render_status_or_history(tmp_path: Path) -> None:
 
     report = render_markdown(store, analysis_id)
 
-    assert "- Status: **inferred**" in report  # certainty, mislabelled as status
-    assert "supported" not in report
-    assert "frequency sweep matched" not in report
+    assert "- Status: **inferred**" not in report  # the mislabelling is gone
+    assert "- Certainty: **inferred**" in report
+    assert "- Hypothesis status: **supported**" in report
+    assert "frequency sweep matched" in report
