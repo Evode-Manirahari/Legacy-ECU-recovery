@@ -126,7 +126,7 @@ nodes:
     title: Epistemic evidence data model
     depends_on:
       - GRAPH-001
-    status: UNVERIFIED-UNDER-GRAPH
+    status: PASSED
     worker: coding-agent
     prompt: prompts/EVIDENCE-001.md
     # Widened 2026-08-18. src/ecu_recovery/evidence/ is only a re-export shim;
@@ -145,7 +145,15 @@ nodes:
       commands:
         - uv run pytest
     retry_budget: 2
-    note: Missing Evidence and Relationship entities, status model, and history.
+    # Verified after PR #8 and #14. All six entities, every required hypothesis
+    # field, and all five statuses are present; revisions preserve history,
+    # evidence is immutable, relationships carry confidence and evidence
+    # references, migration is additive and idempotent, and foreign keys are
+    # enforced per connection. The audit found one real defect and PR #14 fixed
+    # it: INSERT OR REPLACE resolves as delete-then-insert, so the BEFORE UPDATE
+    # triggers never fired and belief could be rewritten in place. Every
+    # append-only table now also carries a BEFORE INSERT guard.
+    note: Verified after PR #8 and #14; append-only belief history holds under audit.
 
   GHIDRA-001:
     title: Deterministic PyGhidra static analysis
