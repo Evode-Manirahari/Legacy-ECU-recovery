@@ -15,7 +15,12 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from evaluation_support import MINIMUM_FIXTURES, RECORDED_REPORT, recorded_results
+from evaluation_support import (
+    MINIMUM_FIXTURES,
+    RECORDED_REPORT,
+    RECORDED_RESULTS,
+    recorded_results,
+)
 
 from ecu_recovery.evaluation.harness import GATE_TARGETS, check_gate
 from ecu_recovery.evaluation.models import (
@@ -194,6 +199,28 @@ def test_the_baseline_carries_no_timestamp_so_it_stays_reproducible() -> None:
 
     for token in ("timestamp", "generated_at", "duration", "elapsed"):
         assert token not in text.lower()
+
+
+def test_the_baseline_records_no_absolute_path() -> None:
+    """An absolute path would pin the baseline to the directory that wrote it.
+
+    The digest covers the frozen payload, so a checkout-dependent `source_path`
+    made every other clone and worktree report a spurious mismatch. What was
+    analyzed is pinned by `executable_sha256` instead, which is content.
+    """
+    text = RECORDED_RESULTS.read_text(encoding="utf-8")
+
+    assert "/Users/" not in text
+    assert "/home/" not in text
+    for fixture in recorded_results()["fixtures"]:
+        assert fixture["sample_id"] in text
+
+
+def test_every_frozen_digest_is_distinct_per_fixture() -> None:
+    """Eight identical digests would mean the freeze captured nothing specific."""
+    digests = [item["analysis_digest"] for item in recorded_results()["fixtures"]]
+
+    assert len(set(digests)) == len(digests)
 
 
 def test_the_environment_that_produced_the_baseline_is_recorded() -> None:
