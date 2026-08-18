@@ -89,7 +89,7 @@ nodes:
     title: Synthetic firmware laboratory
     depends_on:
       - GRAPH-001
-    status: UNVERIFIED-UNDER-GRAPH
+    status: PASSED
     worker: coding-agent
     prompt: prompts/DATA-001.md
     # Narrowed 2026-08-18. `tests/**` covered the whole test tree, including
@@ -106,7 +106,7 @@ nodes:
       commands:
         - uv run pytest
     retry_budget: 2
-    note: Six of eight required fixture categories exist from pre-graph work.
+    note: Verified after PR #6; all eight required fixture categories present.
 
   RESEARCH-001:
     title: First ECU architecture research
