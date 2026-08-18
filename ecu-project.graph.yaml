@@ -242,7 +242,7 @@ nodes:
     depends_on:
       - TOOLS-001
       - EVIDENCE-001
-    status: PENDING
+    status: PASSED
     worker: coding-agent
     prompt: prompts/INTEGRATION-STATIC-001.md
     allowed_paths:
@@ -253,6 +253,16 @@ nodes:
       commands:
         - uv run pytest
     retry_budget: 2
+    # Verified after PR #20. Two fixtures were driven through every stage the
+    # contract names, against merged upstream interfaces with nothing stubbed.
+    # The deterministic half of the report re-derives byte for byte from a
+    # fresh workspace, every evidence citation resolves, and no absolute path
+    # or engine object reaches the artifact. Three interface findings were
+    # reported rather than patched, which is what this node's contract asks
+    # for: two in report.py, one in BinaryAnalysis. None blocks the flow, and
+    # the report.py pair is why GATE-STATIC-MVP is held by human decision
+    # rather than run as soon as it becomes graph-ready.
+    note: Verified after PR #20; end-to-end flow proven, three findings reported.
 
   GATE-STATIC-MVP:
     title: Static MVP gate
