@@ -271,7 +271,7 @@ nodes:
     # before the gate runs. INTEGRATION-STATIC-001 found that it does not.
     depends_on:
       - INTEGRATION-STATIC-001
-    status: PENDING
+    status: PASSED
     worker: coding-agent
     prompt: prompts/REPORT-001.md
     # Three paths beyond report.py itself, all for the same reason: they pin the
@@ -304,6 +304,15 @@ nodes:
       commands:
         - uv run pytest
     retry_budget: 2
+    # Verified after PR #23. Certainty and HypothesisStatus render as separate
+    # concepts, all five statuses are distinguishable, and a belief that moved
+    # carries its revision chain with the recorded reason. No schema change was
+    # needed: the status and change_reason were already in the rows report_data
+    # returns. The two nodes that pinned the defect had their assertions
+    # inverted rather than deleted, so the record of what was wrong stays
+    # legible, and the integration flow's auto-detected findings fell from
+    # three to one on their own.
+    note: Verified after PR #23; the report distinguishes belief from testing.
 
   GATE-STATIC-MVP:
     title: Static MVP gate
