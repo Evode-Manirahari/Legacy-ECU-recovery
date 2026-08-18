@@ -14,6 +14,7 @@ Where each rule is enforced:
 | unknown dependency | this module |
 | self-dependency | this module |
 | cycle | this module |
+| unsafe ownership overlap | this module |
 
 The first two are structurally impossible to represent once a `Graph` exists —
 a status is an enum and node ids are mapping keys — so they are caught at the
@@ -91,12 +92,88 @@ def _find_cycles(graph: Graph) -> list[str]:
     return errors
 
 
+def _dependency_closure(graph: Graph, node_id: str) -> set[str]:
+    """Every node this one transitively depends on."""
+    seen: set[str] = set()
+    stack = [node_id]
+    while stack:
+        for dependency in graph.node(stack.pop()).depends_on:
+            if dependency in graph and dependency not in seen:
+                seen.add(dependency)
+                stack.append(dependency)
+    return seen
+
+
+def can_run_concurrently(graph: Graph, first: str, second: str) -> bool:
+    """Whether two nodes could ever be assigned at the same time.
+
+    Ordered nodes cannot collide: if one depends on the other, even
+    transitively, the second never starts until the first has passed. Only
+    independent nodes need disjoint ownership.
+    """
+    if first == second:
+        return False
+    return first not in _dependency_closure(graph, second) and second not in _dependency_closure(
+        graph, first
+    )
+
+
+def _pattern_segments(pattern: str) -> tuple[str, ...]:
+    """Reduce an allowed-path pattern to the directory prefix it governs.
+
+    `a/b/**` and `a/b` both govern everything under `a/b`; a bare file path
+    governs only itself. Comparing segment tuples keeps `tests/test_a.py` from
+    looking like a prefix of `tests/test_ab.py`.
+    """
+    trimmed = pattern.strip().rstrip("/")
+    if trimmed.endswith("/**"):
+        trimmed = trimmed[: -len("/**")]
+    elif trimmed == "**":
+        trimmed = ""
+    return tuple(part for part in trimmed.split("/") if part)
+
+
+def paths_overlap(first: str, second: str) -> bool:
+    """Whether two allowed-path patterns can match a common file.
+
+    True when one governs a location at or inside the other, which is exactly
+    the case where two workers could edit the same file.
+    """
+    left, right = _pattern_segments(first), _pattern_segments(second)
+    shared = min(len(left), len(right))
+    return left[:shared] == right[:shared]
+
+
+def find_ownership_overlaps(graph: Graph) -> list[str]:
+    """Report ownership shared between nodes that may run concurrently.
+
+    This is what stops a parallel fan-out from having two workers edit the same
+    file. It is deliberately narrow: it compares declared patterns and says
+    nothing about whether a file exists.
+    """
+    overlaps: list[str] = []
+    nodes = list(graph)
+    for index, first in enumerate(nodes):
+        for second in nodes[index + 1 :]:
+            if not can_run_concurrently(graph, first.id, second.id):
+                continue
+            for left in first.allowed_paths:
+                for right in second.allowed_paths:
+                    if paths_overlap(left, right):
+                        overlaps.append(
+                            f"{first.id} and {second.id} may run concurrently but both own "
+                            f"overlapping paths: {left!r} and {right!r}"
+                        )
+    return overlaps
+
+
 def collect_errors(graph: Graph) -> list[str]:
     """Return every structural problem in the graph, in a stable order."""
     return [
         *_find_unknown_dependencies(graph),
         *_find_self_dependencies(graph),
         *_find_cycles(graph),
+        *find_ownership_overlaps(graph),
     ]
 
 
