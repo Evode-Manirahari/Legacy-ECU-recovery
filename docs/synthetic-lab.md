@@ -36,6 +36,27 @@ Reasons:
 This choice is intentionally host-specific. A later dataset version may add a
 bare-metal cross target after its compiler and linker are pinned.
 
+## Known limitation: the fixtures only execute on x86-64 macOS
+
+Everything that *runs* a fixture is gated on `x86_64` Darwin:
+
+- `scripts/build_synthetic.py` refuses to build on any other host;
+- behaviour probes load `behavior.dylib` through `ctypes`;
+- self-test and reproducibility checks execute the Mach-O binaries directly;
+- constant recovery reads Mach-O disassembly through `otool`.
+
+**CI runs on Linux, so those tests skip there** — currently 13 skips. What still
+runs everywhere is the metadata layer: ground-truth completeness, artifact
+hashes, category coverage, and the contract-field checks. A fixture regression
+that changes behaviour would therefore be caught on a developer's macOS machine,
+not by CI.
+
+`DATA-001` was explicitly ruled *not* to solve this. Making the laboratory
+portable means choosing a second architecture, and `RESEARCH-001` has not yet
+recommended the first one; rebuilding before that recommendation exists would
+mean choosing twice. The options when it is addressed are an x86-64 macOS CI
+runner, a portable cross-compiled target, or accepting the gap deliberately.
+
 ## Dataset layout
 
 ```text
@@ -71,12 +92,57 @@ flags, locale, linker UUID behavior, and dynamic-library install name. Every
 
 ## Samples
 
+All eight fixture categories required by the `DATA-001` contract:
+
+| # | Category | Sample |
+|---|---|---|
+| 1 | temperature threshold controller | `temperature_controller_v1` |
+| 2 | RPM-like calculation | `rpm_calculation_v1` |
+| 3 | one-dimensional lookup table | `lookup_1d_v1` |
+| 4 | two-dimensional lookup table | `lookup_2d_v1` |
+| 5 | state machine | `state_machine_v1` |
+| 6 | multi-function call graph | `multi_function_pipeline_v1` |
+| 7 | integer/bit-mask manipulation | `bitmask_manipulation_v1` |
+| 8 | timer-like counter logic | `timer_counter_v1` |
+
 1. strict temperature threshold controller;
 2. pulse-period to RPM calculation with invalid-input guards;
 3. clamped one-dimensional table with integer interpolation;
 4. clamped three-by-four calibration table;
 5. four-state controller with RPM and fault transitions;
-6. sensor normalization, gain, and clamping call pipeline.
+6. sensor normalization, gain, and clamping call pipeline;
+7. nibble-field extraction, flag counting, and mask clearing over a packed
+   status word;
+8. sixteen-bit free-running counter with rollover-correct elapsed time, a fixed
+   stale threshold, and a caller-supplied clamp.
+
+## What `expected_constants` means
+
+A constant is recoverable if the compiler emitted it either as an instruction
+operand or as data. Which one happens is the compiler's choice, not the fixture
+author's:
+
+- small values become one-byte immediates (`rpm_calculation_v1`'s `60`);
+- table entries land in `__TEXT,__const` as int32 data (`lookup_1d_v1`'s axis
+  and output tables);
+- some values survive as neither.
+
+`test_expected_constants_are_actually_recoverable` checks both encodings for
+every sample. It exists because a claimed-but-absent constant would score as a
+tool failure during evaluation when the fault is really in the fixture.
+
+Two constants are deliberately **not** claimed, and each sample records why in
+a `constant_notes` field:
+
+- `timer_counter_v1` does not claim its `65536` modulus. The compiler proves the
+  wrap is a sixteen-bit truncation and emits `movzwl` with no operand.
+- `bitmask_manipulation_v1` does not claim `28`; the range check compiles to an
+  unsigned comparison against `29`.
+
+Zero is not claimed by the two fixtures added under `DATA-001`, because it is
+materialised with `xor` rather than an operand. The six earlier fixtures do
+claim it, which is a discrepancy `EVAL-STATIC-001` will need to settle when it
+defines the constant-discovery metric.
 
 ## Exact scoring for Prompt 3 and later
 

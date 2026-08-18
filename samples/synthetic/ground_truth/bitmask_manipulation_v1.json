@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "sample_id": "bitmask_manipulation_v1",
+  "title": "Integer and bit-mask status decoding",
+  "source": "source/bitmask_manipulation.c",
+  "probe_parameters": ["word", "shift", "clear_mask"],
+  "expected_functions": [
+    "bitmask_status",
+    "count_active_flags",
+    "extract_field",
+    "main",
+    "sample_probe"
+  ],
+  "expected_function_roles": {
+    "bitmask_status": "Clears masked bits, then packs the extracted nibble field and the active-flag count into one result.",
+    "count_active_flags": "Counts set bits in the low sixteen bits of a status word.",
+    "extract_field": "Extracts a four-bit field at a shift, returning zero when the shift is out of range.",
+    "main": "Runs embedded behavior self-tests and returns zero only when all pass.",
+    "sample_probe": "Passes all three probe inputs to the status decoder."
+  },
+  "classification_functions": [
+    "bitmask_status",
+    "count_active_flags",
+    "extract_field"
+  ],
+  "expected_call_edges": [
+    {"caller": "main", "callee": "sample_probe"},
+    {"caller": "sample_probe", "callee": "bitmask_status"},
+    {"caller": "bitmask_status", "callee": "extract_field"},
+    {"caller": "bitmask_status", "callee": "count_active_flags"}
+  ],
+  "expected_constants": [8, 15, 255, 65535],
+  "constant_notes": "MAX_FIELD_SHIFT 28 is deliberately not claimed: the range check compiles to an unsigned comparison against 29. Zero is not claimed either, because it is materialised with xor rather than an operand. Every value listed above was verified present as an instruction immediate.",
+  "expected_behavior": [
+    {"inputs": {"word": 4660, "shift": 8, "clear_mask": 0}, "output": 517},
+    {"inputs": {"word": 65535, "shift": 4, "clear_mask": 3840}, "output": 3852},
+    {"inputs": {"word": 0, "shift": 0, "clear_mask": 0}, "output": 0},
+    {"inputs": {"word": 255, "shift": 64, "clear_mask": 0}, "output": 8},
+    {"inputs": {"word": 16711935, "shift": 16, "clear_mask": 0}, "output": 3848}
+  ]
+}

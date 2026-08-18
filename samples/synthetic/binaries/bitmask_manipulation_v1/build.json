@@ -1,0 +1,62 @@
+{
+  "architecture": "x86_64-apple-darwin",
+  "artifacts": {
+    "behavior.dylib": "7dc260e4d2c4baae267e2c592e35be0606ae38f7d229761d54e0fe6f46ce7779",
+    "firmware.stripped": "17c9d3f798fc90145956a7eef0785430a1990a812d67a45326a94eee416db980",
+    "firmware.symbols": "8fd8c71d56f9b507ecdb9dde7b90084a99d0ccc8723f2e15518e7085030e6e8a"
+  },
+  "commands": {
+    "behavior_library": [
+      "/usr/bin/clang",
+      "-std=c11",
+      "-arch",
+      "x86_64",
+      "-mmacosx-version-min=13.0",
+      "-O1",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-fno-inline",
+      "-fno-omit-frame-pointer",
+      "-fno-stack-protector",
+      "-DSAMPLE_BEHAVIOR_LIBRARY",
+      "-dynamiclib",
+      "-fvisibility=hidden",
+      "${PROJECT_ROOT}/samples/synthetic/source/bitmask_manipulation.c",
+      "-Wl,-install_name,@rpath/behavior.dylib",
+      "-Wl,-no_uuid",
+      "-o",
+      "${PROJECT_ROOT}/samples/synthetic/binaries/bitmask_manipulation_v1/behavior.dylib"
+    ],
+    "strip": [
+      "/usr/bin/strip",
+      "-S",
+      "-x",
+      "firmware.stripped"
+    ],
+    "symbols_on": [
+      "/usr/bin/clang",
+      "-std=c11",
+      "-arch",
+      "x86_64",
+      "-mmacosx-version-min=13.0",
+      "-O1",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-fno-inline",
+      "-fno-omit-frame-pointer",
+      "-fno-stack-protector",
+      "-fno-pie",
+      "${PROJECT_ROOT}/samples/synthetic/source/bitmask_manipulation.c",
+      "-Wl,-no_pie",
+      "-Wl,-no_uuid",
+      "-o",
+      "${PROJECT_ROOT}/samples/synthetic/binaries/bitmask_manipulation_v1/firmware.symbols"
+    ]
+  },
+  "compiler": "Apple clang version 16.0.0 (clang-1600.0.26.6)",
+  "sample_id": "bitmask_manipulation_v1",
+  "schema_version": 1,
+  "source_sha256": "b5a1c7d62c6019f52ad1c427183ad46d40b7f2d50205ba8d7e9a8112f0fbf911"
+}

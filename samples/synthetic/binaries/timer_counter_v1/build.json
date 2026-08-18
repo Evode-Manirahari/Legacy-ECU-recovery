@@ -1,0 +1,62 @@
+{
+  "architecture": "x86_64-apple-darwin",
+  "artifacts": {
+    "behavior.dylib": "d95f8c471d6efae4c2b62409a046a0f6fc6a268960aba51387d2da3c74893123",
+    "firmware.stripped": "16b71aded2e0bb64ced5678418bf97543c8c08d203ef9815e005ba3d1c92510d",
+    "firmware.symbols": "6c60f96692a288b5c05ab79f6e99249f14bc49958e176eb75db72425cebc914e"
+  },
+  "commands": {
+    "behavior_library": [
+      "/usr/bin/clang",
+      "-std=c11",
+      "-arch",
+      "x86_64",
+      "-mmacosx-version-min=13.0",
+      "-O1",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-fno-inline",
+      "-fno-omit-frame-pointer",
+      "-fno-stack-protector",
+      "-DSAMPLE_BEHAVIOR_LIBRARY",
+      "-dynamiclib",
+      "-fvisibility=hidden",
+      "${PROJECT_ROOT}/samples/synthetic/source/timer_counter.c",
+      "-Wl,-install_name,@rpath/behavior.dylib",
+      "-Wl,-no_uuid",
+      "-o",
+      "${PROJECT_ROOT}/samples/synthetic/binaries/timer_counter_v1/behavior.dylib"
+    ],
+    "strip": [
+      "/usr/bin/strip",
+      "-S",
+      "-x",
+      "firmware.stripped"
+    ],
+    "symbols_on": [
+      "/usr/bin/clang",
+      "-std=c11",
+      "-arch",
+      "x86_64",
+      "-mmacosx-version-min=13.0",
+      "-O1",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-fno-inline",
+      "-fno-omit-frame-pointer",
+      "-fno-stack-protector",
+      "-fno-pie",
+      "${PROJECT_ROOT}/samples/synthetic/source/timer_counter.c",
+      "-Wl,-no_pie",
+      "-Wl,-no_uuid",
+      "-o",
+      "${PROJECT_ROOT}/samples/synthetic/binaries/timer_counter_v1/firmware.symbols"
+    ]
+  },
+  "compiler": "Apple clang version 16.0.0 (clang-1600.0.26.6)",
+  "sample_id": "timer_counter_v1",
+  "schema_version": 1,
+  "source_sha256": "1a760dbc79f3823f4569f55de513f568832fb7474f3b1d70c97c6db044d0f8dd"
+}
