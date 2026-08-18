@@ -25,8 +25,8 @@ uv run ecu-recovery graph ready
 | `RESEARCH-001` | PENDING | **READY** — no target matrix exists |
 | `EVIDENCE-001` | UNVERIFIED-UNDER-GRAPH | **READY** — no Relationship/Evidence entity, no history |
 | `GHIDRA-001` | PASSED | verified after PR #11; contract satisfied, eight fixtures structurally exact |
-| `EVAL-STATIC-001` | PENDING | **READY** — no harness, no results artifacts |
-| `TOOLS-001` | PENDING | no bounded tool layer |
+| `EVAL-STATIC-001` | PASSED | verified after PR #13 and #15; static gate passes on all six thresholds |
+| `TOOLS-001` | PENDING | **READY** — no bounded tool layer |
 | `INTEGRATION-STATIC-001` | PENDING | |
 | `GATE-STATIC-MVP` | PENDING | blocks all agent work |
 
@@ -53,10 +53,10 @@ SPEC-001 → REPO-001 → GRAPH-001 ─┬─→ DATA-001 ─→ GHIDRA-001 ─�
 
 ## NOW — frontier is open, awaiting assignment
 
-`RESEARCH-001`, `EVIDENCE-001`, and `EVAL-STATIC-001` are all `READY`.
-`GHIDRA-001` passing is what made `EVAL-STATIC-001` graph-eligible; that is the
+`RESEARCH-001`, `EVIDENCE-001`, and `TOOLS-001` are all `READY`.
+`EVAL-STATIC-001` passing is what made `TOOLS-001` graph-eligible; that is the
 only thing that changed. Their file ownership is disjoint (`docs/research/`,
-`src/ecu_recovery/evidence/`, `src/ecu_recovery/evaluation/`), so up to three
+`src/ecu_recovery/evidence/`, `src/ecu_recovery/tools/`), so up to three
 isolated worktrees may run them concurrently. None starts without an explicit
 assignment.
 
@@ -67,11 +67,9 @@ assignment.
 - `EVIDENCE-001` — add `Relationship` and `Evidence` entities, the hypothesis
   status enum (`UNTESTED`, `SUPPORTED`, `WEAKENED`, `REJECTED`, `CONFIRMED`),
   migrations, and preserved hypothesis history.
-- `EVAL-STATIC-001` — build the deterministic harness and produce
-  `artifacts/evals/static-results.json` and `static-report.md`. `GHIDRA-001`
-  established that extraction is deterministic; how accurate it is has not been
-  measured, and measuring it is this node's job.
 - `TOOLS-001` — bounded, schema-validated agent-facing tools; no LLM, no MCP.
+  `EVAL-STATIC-001` measured the deterministic layer before it is exposed
+  through a tool surface, which is why that edge exists.
 - `INTEGRATION-STATIC-001` — end-to-end controlled flow plus full regression.
 - `GATE-STATIC-MVP` — verification node.
 
