@@ -92,10 +92,14 @@ nodes:
     status: UNVERIFIED-UNDER-GRAPH
     worker: coding-agent
     prompt: prompts/DATA-001.md
+    # Narrowed 2026-08-18. `tests/**` covered the whole test tree, including
+    # tests/evidence/** and tests/graph/**, so it overlapped nodes that can be
+    # READY at the same time.
     allowed_paths:
       - samples/**
       - scripts/**
-      - tests/**
+      - tests/test_synthetic_lab.py
+      - tests/samples/**
       - docs/synthetic-lab.md
     verification:
       type: commands
@@ -125,9 +129,17 @@ nodes:
     status: UNVERIFIED-UNDER-GRAPH
     worker: coding-agent
     prompt: prompts/EVIDENCE-001.md
+    # Widened 2026-08-18. src/ecu_recovery/evidence/ is only a re-export shim;
+    # the persistence this node must extend lives in store.py and models.py,
+    # and its existing tests are in tests/test_store_report.py. report.py is
+    # deliberately excluded: if it must change, that is an interface issue to
+    # report for human review, not a silent edit.
     allowed_paths:
       - src/ecu_recovery/evidence/**
+      - src/ecu_recovery/store.py
+      - src/ecu_recovery/models.py
       - tests/evidence/**
+      - tests/test_store_report.py
     verification:
       type: commands
       commands:

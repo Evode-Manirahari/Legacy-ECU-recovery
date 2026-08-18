@@ -52,7 +52,16 @@ from .status import (
     render_status_table,
     unmet_dependencies,
 )
-from .validator import GraphError, GraphValidationError, collect_errors, is_acyclic, validate
+from .validator import (
+    GraphError,
+    GraphValidationError,
+    can_run_concurrently,
+    collect_errors,
+    find_ownership_overlaps,
+    is_acyclic,
+    paths_overlap,
+    validate,
+)
 
 __all__ = [
     "DEFAULT_GRAPH_PATH",
@@ -70,7 +79,10 @@ __all__ = [
     "VerificationKind",
     "blocked_nodes",
     "build_graph",
+    "can_run_concurrently",
     "collect_errors",
+    "find_ownership_overlaps",
+    "paths_overlap",
     "is_acyclic",
     "is_blocked",
     "is_eligible",

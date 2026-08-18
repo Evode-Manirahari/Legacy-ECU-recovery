@@ -11,9 +11,14 @@ Create controlled binary fixtures with hidden ground truth.
 
 ## Ownership
 
-Allowed: `samples/**`, `scripts/**`, `tests/**`, `docs/synthetic-lab.md`.
+Canonical source: `ecu-project.graph.yaml`. Restated here for the worker.
 
-Forbidden: `src/**`, `graph/**`, `prompts/**`.
+Allowed: `samples/**`, `scripts/**`, `tests/test_synthetic_lab.py`,
+`tests/samples/**`, `docs/synthetic-lab.md`.
+
+Forbidden: `src/**`, `graph/**`, `prompts/**`, and the rest of `tests/**` —
+`tests/evidence/`, `tests/graph/`, and the analysis tests belong to other nodes
+that may be running at the same time.
 
 ## Required fixture categories
 

@@ -11,9 +11,19 @@ Implement the first SQLite evidence model.
 
 ## Ownership
 
-Allowed: `src/ecu_recovery/evidence/**`, `tests/evidence/**`.
+Canonical source: `ecu-project.graph.yaml`. Restated here for the worker.
 
-Forbidden: `src/ecu_recovery/analysis/**`, `samples/**`, `graph/**`.
+Allowed: `src/ecu_recovery/evidence/**`, `src/ecu_recovery/store.py`,
+`src/ecu_recovery/models.py`, `tests/evidence/**`,
+`tests/test_store_report.py`.
+
+Forbidden: `src/ecu_recovery/analysis/**`, `samples/**`, `graph/**`, and
+`src/ecu_recovery/report.py`.
+
+`report.py` renders hypotheses, so a change to the hypothesis model may appear
+to require editing it. Do not. Report it as an interface/ownership issue for
+human review instead — that boundary exists so a schema change cannot silently
+alter what the engineering report claims.
 
 ## Required entities
 
