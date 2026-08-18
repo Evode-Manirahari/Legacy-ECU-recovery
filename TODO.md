@@ -26,8 +26,8 @@ uv run ecu-recovery graph ready
 | `EVIDENCE-001` | PASSED | verified after PR #8 and #14; append-only belief history holds under audit |
 | `GHIDRA-001` | PASSED | verified after PR #11; contract satisfied, eight fixtures structurally exact |
 | `EVAL-STATIC-001` | PASSED | verified after PR #13 and #15; static gate passes on all six thresholds |
-| `TOOLS-001` | PENDING | **READY** — no bounded tool layer |
-| `INTEGRATION-STATIC-001` | PENDING | |
+| `TOOLS-001` | PASSED | verified after PR #18; ten bounded, schema-checked tools |
+| `INTEGRATION-STATIC-001` | PENDING | **READY** — no end-to-end controlled flow |
 | `GATE-STATIC-MVP` | PENDING | blocks all agent work |
 
 Pre-graph code is *candidate implementation to verify and complete*, never
@@ -53,19 +53,16 @@ SPEC-001 → REPO-001 → GRAPH-001 ─┬─→ DATA-001 ─→ GHIDRA-001 ─�
 
 ## NOW — frontier is open, awaiting assignment
 
-`RESEARCH-001` and `TOOLS-001` are `READY`. `EVIDENCE-001` passing removes it
-from the frontier and leaves `INTEGRATION-STATIC-001` waiting only on
-`TOOLS-001`. Their file ownership is disjoint (`docs/research/`,
-`src/ecu_recovery/tools/`), so both may run in isolated worktrees
-concurrently. None starts without an explicit assignment.
+`RESEARCH-001` and `INTEGRATION-STATIC-001` are `READY`. `TOOLS-001` passing
+was the last edge into `INTEGRATION-STATIC-001`, which is the final node before
+`GATE-STATIC-MVP`. Their file ownership is disjoint (`docs/research/`,
+`artifacts/integration/` plus `tests/integration/`), so both may run in isolated
+worktrees concurrently. None starts without an explicit assignment.
 
 ## NEXT
 
 - `RESEARCH-001` — produce `docs/research/ecu-target-matrix.{md,csv}`. Recommend
   candidates only; final architecture selection is a human gate.
-- `TOOLS-001` — bounded, schema-validated agent-facing tools; no LLM, no MCP.
-  `EVAL-STATIC-001` measured the deterministic layer before it is exposed
-  through a tool surface, which is why that edge exists.
 - `INTEGRATION-STATIC-001` — end-to-end controlled flow plus full regression.
 - `GATE-STATIC-MVP` — verification node.
 
