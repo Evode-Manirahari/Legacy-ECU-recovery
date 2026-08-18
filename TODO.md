@@ -21,10 +21,10 @@ uv run ecu-recovery graph ready
 | `SPEC-001` | PASSED | human-approved 2026-08-17 |
 | `REPO-001` | PASSED | audited against contract; CI added |
 | `GRAPH-001` | PASSED | amendment cleared GitHub CI and merged |
-| `DATA-001` | UNVERIFIED-UNDER-GRAPH | **READY** — 6 of 8 fixture categories exist |
+| `DATA-001` | PASSED | verified after PR #6; all eight fixture categories present |
 | `RESEARCH-001` | PENDING | **READY** — no target matrix exists |
 | `EVIDENCE-001` | UNVERIFIED-UNDER-GRAPH | **READY** — no Relationship/Evidence entity, no history |
-| `GHIDRA-001` | UNVERIFIED-UNDER-GRAPH | adapter exists; no analysis-warnings field |
+| `GHIDRA-001` | UNVERIFIED-UNDER-GRAPH | **READY** — adapter exists; no analysis-warnings field |
 | `EVAL-STATIC-001` | PENDING | no harness, no results artifacts |
 | `TOOLS-001` | PENDING | no bounded tool layer |
 | `INTEGRATION-STATIC-001` | PENDING | |
@@ -53,20 +53,15 @@ SPEC-001 → REPO-001 → GRAPH-001 ─┬─→ DATA-001 ─→ GHIDRA-001 ─�
 
 ## NOW — frontier is open, awaiting assignment
 
-`DATA-001`, `RESEARCH-001`, and `EVIDENCE-001` are all `READY`. Their file
-ownership is disjoint (`samples/`+`scripts/`, `docs/research/`,
-`src/ecu_recovery/evidence/`), so up to three isolated worktrees may run them
-concurrently. None starts without an explicit assignment.
-
-Do not start `GHIDRA-001` until `DATA-001` passes.
+`RESEARCH-001`, `EVIDENCE-001`, and `GHIDRA-001` are all `READY`. `DATA-001`
+passing is what made `GHIDRA-001` graph-eligible; that is the only thing that
+changed. Their file ownership is disjoint (`docs/research/`,
+`src/ecu_recovery/evidence/`, `src/ecu_recovery/analysis/`), so up to three
+isolated worktrees may run them concurrently. None starts without an explicit
+assignment.
 
 ## NEXT
 
-- `DATA-001` — verify existing categories, add the missing integer/bit-mask and
-  timer-like counter fixtures, preserve ground truth and reproducible builds.
-  **Ruled 2026-08-17:** this node does *not* solve the x86-64 Mach-O
-  portability question; keep it documented as a known limitation and let
-  `RESEARCH-001` inform the eventual target architecture.
 - `RESEARCH-001` — produce `docs/research/ecu-target-matrix.{md,csv}`. Recommend
   candidates only; final architecture selection is a human gate.
 - `EVIDENCE-001` — add `Relationship` and `Evidence` entities, the hypothesis

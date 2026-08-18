@@ -45,7 +45,12 @@ def test_the_project_graph_has_no_unsafe_overlap() -> None:
 
 
 def test_the_current_fan_out_owns_disjoint_paths() -> None:
-    """DATA-001, RESEARCH-001, and EVIDENCE-001 are READY together."""
+    """The three GRAPH-001 dependents can be assigned together.
+
+    Siblings with no edge between them, so the graph never orders their work:
+    whenever more than one is eligible they run concurrently, and that is a
+    property of the edges rather than of anyone's current status.
+    """
     graph = load_graph()
     fan_out = ("DATA-001", "RESEARCH-001", "EVIDENCE-001")
 
