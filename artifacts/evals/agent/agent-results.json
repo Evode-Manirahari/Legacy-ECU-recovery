@@ -1,0 +1,443 @@
+{
+  "adversarial_corpus": true,
+  "detection_mismatches": [],
+  "detection_verified": true,
+  "gate": [
+    {
+      "comparison": "==",
+      "metric": "evidence_reference_validity",
+      "observed": {
+        "denominator": 9,
+        "numerator": 7,
+        "percent": 77.7778,
+        "rate": 0.7777777777777778
+      },
+      "observed_count": null,
+      "passed": false,
+      "threshold": 100.0
+    },
+    {
+      "comparison": "==",
+      "metric": "schema_compliance",
+      "observed": {
+        "denominator": 8,
+        "numerator": 7,
+        "percent": 87.5,
+        "rate": 0.875
+      },
+      "observed_count": null,
+      "passed": false,
+      "threshold": 100.0
+    },
+    {
+      "comparison": "<=",
+      "metric": "unsupported_factual_claims",
+      "observed": {
+        "denominator": 5,
+        "numerator": 0,
+        "percent": 0.0,
+        "rate": 0.0
+      },
+      "observed_count": null,
+      "passed": true,
+      "threshold": 5.0
+    },
+    {
+      "comparison": "==",
+      "metric": "tool_hallucinations",
+      "observed": null,
+      "observed_count": 2,
+      "passed": false,
+      "threshold": 0.0
+    },
+    {
+      "comparison": "==",
+      "metric": "critical_unsupported_claims",
+      "observed": null,
+      "observed_count": 0,
+      "passed": true,
+      "threshold": 0.0
+    }
+  ],
+  "gate_would_pass": false,
+  "metrics": {
+    "classification_term_recall_baseline": {
+      "denominator": 56,
+      "numerator": 5,
+      "percent": 8.9286,
+      "rate": 0.08928571428571429
+    },
+    "confidence_calibration": [
+      {
+        "calibration_gap": -0.875,
+        "claims": 1,
+        "midpoint": 0.125,
+        "observed_support": {
+          "denominator": 1,
+          "numerator": 1,
+          "percent": 100.0,
+          "rate": 1.0
+        },
+        "range": [
+          0.0,
+          0.25
+        ],
+        "supported": 1
+      },
+      {
+        "calibration_gap": -0.375,
+        "claims": 1,
+        "midpoint": 0.625,
+        "observed_support": {
+          "denominator": 1,
+          "numerator": 1,
+          "percent": 100.0,
+          "rate": 1.0
+        },
+        "range": [
+          0.5,
+          0.75
+        ],
+        "supported": 1
+      },
+      {
+        "calibration_gap": -0.125,
+        "claims": 3,
+        "midpoint": 0.875,
+        "observed_support": {
+          "denominator": 3,
+          "numerator": 3,
+          "percent": 100.0,
+          "rate": 1.0
+        },
+        "range": [
+          0.75,
+          1.0
+        ],
+        "supported": 3
+      }
+    ],
+    "critical_unsupported_claims": 0,
+    "demotions": 3,
+    "evidence_reference_validity": {
+      "denominator": 9,
+      "numerator": 7,
+      "percent": 77.7778,
+      "rate": 0.7777777777777778
+    },
+    "schema_compliance": {
+      "denominator": 8,
+      "numerator": 7,
+      "percent": 87.5,
+      "rate": 0.875
+    },
+    "tool_hallucinations": 2,
+    "transcripts": 8,
+    "unsupported_factual_claims": {
+      "denominator": 5,
+      "numerator": 0,
+      "percent": 0.0,
+      "rate": 0.0
+    }
+  },
+  "provenance": {
+    "detail": "scripted replies over real tool output; no model was called",
+    "is_real_model": false,
+    "kind": "authored"
+  },
+  "schema_version": 1,
+  "sufficient_for_gate_agent_mvp": false,
+  "transcripts": [
+    {
+      "citations": 3,
+      "claims": 2,
+      "classification": {
+        "expected_role": "control_output",
+        "matched_terms": [
+          "clamping",
+          "gain",
+          "normalization",
+          "pipeline",
+          "runs"
+        ],
+        "missed_terms": [
+          "control",
+          "function",
+          "multi"
+        ],
+        "subject": "0x100000f00",
+        "term_recall": {
+          "denominator": 8,
+          "numerator": 5,
+          "percent": 62.5,
+          "rate": 0.625
+        }
+      },
+      "critical_unsupported_claims": 0,
+      "demotions": 0,
+      "fabricated_citations": 0,
+      "factual_claims": 2,
+      "notes": [],
+      "parsed": true,
+      "sample_id": "multi_function_pipeline_v1",
+      "scenario": "every factual claim carries citations that all resolve",
+      "subject": "0x100000f00",
+      "transcript_id": "01-supported",
+      "unsupported_factual_claims": 0,
+      "valid_citations": 3
+    },
+    {
+      "citations": 1,
+      "claims": 1,
+      "classification": {
+        "expected_role": "control_output",
+        "matched_terms": [],
+        "missed_terms": [
+          "clamping",
+          "control",
+          "function",
+          "gain",
+          "multi",
+          "normalization",
+          "pipeline",
+          "runs"
+        ],
+        "subject": "0x100000f00",
+        "term_recall": {
+          "denominator": 8,
+          "numerator": 0,
+          "percent": 0.0,
+          "rate": 0.0
+        }
+      },
+      "critical_unsupported_claims": 0,
+      "demotions": 1,
+      "fabricated_citations": 1,
+      "factual_claims": 0,
+      "notes": [],
+      "parsed": true,
+      "sample_id": "multi_function_pipeline_v1",
+      "scenario": "a claim citing a fact that was never gathered",
+      "subject": "0x100000f00",
+      "transcript_id": "02-fabricated-citation",
+      "unsupported_factual_claims": 0,
+      "valid_citations": 0
+    },
+    {
+      "citations": 2,
+      "claims": 1,
+      "classification": {
+        "expected_role": "control_output",
+        "matched_terms": [],
+        "missed_terms": [
+          "clamping",
+          "control",
+          "function",
+          "gain",
+          "multi",
+          "normalization",
+          "pipeline",
+          "runs"
+        ],
+        "subject": "0x100000f00",
+        "term_recall": {
+          "denominator": 8,
+          "numerator": 0,
+          "percent": 0.0,
+          "rate": 0.0
+        }
+      },
+      "critical_unsupported_claims": 0,
+      "demotions": 1,
+      "fabricated_citations": 1,
+      "factual_claims": 0,
+      "notes": [],
+      "parsed": true,
+      "sample_id": "multi_function_pipeline_v1",
+      "scenario": "one resolving citation beside one fabricated citation",
+      "subject": "0x100000f00",
+      "transcript_id": "03-mixed-citations",
+      "unsupported_factual_claims": 0,
+      "valid_citations": 1
+    },
+    {
+      "citations": 0,
+      "claims": 1,
+      "classification": {
+        "expected_role": "control_output",
+        "matched_terms": [],
+        "missed_terms": [
+          "clamping",
+          "control",
+          "function",
+          "gain",
+          "multi",
+          "normalization",
+          "pipeline",
+          "runs"
+        ],
+        "subject": "0x100000f00",
+        "term_recall": {
+          "denominator": 8,
+          "numerator": 0,
+          "percent": 0.0,
+          "rate": 0.0
+        }
+      },
+      "critical_unsupported_claims": 0,
+      "demotions": 1,
+      "fabricated_citations": 0,
+      "factual_claims": 0,
+      "notes": [],
+      "parsed": true,
+      "sample_id": "multi_function_pipeline_v1",
+      "scenario": "a factual claim carrying no citation at all",
+      "subject": "0x100000f00",
+      "transcript_id": "04-unsupported-assertion",
+      "unsupported_factual_claims": 0,
+      "valid_citations": 0
+    },
+    {
+      "citations": 0,
+      "claims": 1,
+      "classification": {
+        "expected_role": "apply_gain",
+        "matched_terms": [],
+        "missed_terms": [
+          "integer",
+          "percentage",
+          "scales",
+          "signed"
+        ],
+        "subject": "0x100000ec0",
+        "term_recall": {
+          "denominator": 4,
+          "numerator": 0,
+          "percent": 0.0,
+          "rate": 0.0
+        }
+      },
+      "critical_unsupported_claims": 0,
+      "demotions": 0,
+      "fabricated_citations": 0,
+      "factual_claims": 0,
+      "notes": [],
+      "parsed": true,
+      "sample_id": "multi_function_pipeline_v1",
+      "scenario": "the agent declining to answer, correctly",
+      "subject": "0x100000ec0",
+      "transcript_id": "05-honest-unknown",
+      "unsupported_factual_claims": 0,
+      "valid_citations": 0
+    },
+    {
+      "citations": 0,
+      "claims": 0,
+      "classification": {
+        "expected_role": "control_output",
+        "matched_terms": [],
+        "missed_terms": [
+          "clamping",
+          "control",
+          "function",
+          "gain",
+          "multi",
+          "normalization",
+          "pipeline",
+          "runs"
+        ],
+        "subject": "0x100000f00",
+        "term_recall": {
+          "denominator": 8,
+          "numerator": 0,
+          "percent": 0.0,
+          "rate": 0.0
+        }
+      },
+      "critical_unsupported_claims": 0,
+      "demotions": 0,
+      "fabricated_citations": 0,
+      "factual_claims": 0,
+      "notes": [
+        "unusable reply: reply is not JSON: Expecting value: line 1 column 1 (char 0)"
+      ],
+      "parsed": false,
+      "sample_id": "multi_function_pipeline_v1",
+      "scenario": "a reply that is not usable JSON",
+      "subject": "0x100000f00",
+      "transcript_id": "06-malformed-reply",
+      "unsupported_factual_claims": 0,
+      "valid_citations": 0
+    },
+    {
+      "citations": 1,
+      "claims": 1,
+      "classification": {
+        "expected_role": "apply_gain",
+        "matched_terms": [],
+        "missed_terms": [
+          "integer",
+          "percentage",
+          "scales",
+          "signed"
+        ],
+        "subject": "0x100000ec0",
+        "term_recall": {
+          "denominator": 4,
+          "numerator": 0,
+          "percent": 0.0,
+          "rate": 0.0
+        }
+      },
+      "critical_unsupported_claims": 0,
+      "demotions": 0,
+      "fabricated_citations": 0,
+      "factual_claims": 1,
+      "notes": [],
+      "parsed": true,
+      "sample_id": "multi_function_pipeline_v1",
+      "scenario": "well-cited claims describing the wrong role",
+      "subject": "0x100000ec0",
+      "transcript_id": "07-wrong-classification",
+      "unsupported_factual_claims": 0,
+      "valid_citations": 1
+    },
+    {
+      "citations": 2,
+      "claims": 2,
+      "classification": {
+        "expected_role": "control_output",
+        "matched_terms": [],
+        "missed_terms": [
+          "clamping",
+          "control",
+          "function",
+          "gain",
+          "multi",
+          "normalization",
+          "pipeline",
+          "runs"
+        ],
+        "subject": "0x100000f00",
+        "term_recall": {
+          "denominator": 8,
+          "numerator": 0,
+          "percent": 0.0,
+          "rate": 0.0
+        }
+      },
+      "critical_unsupported_claims": 0,
+      "demotions": 0,
+      "fabricated_citations": 0,
+      "factual_claims": 2,
+      "notes": [],
+      "parsed": true,
+      "sample_id": "multi_function_pipeline_v1",
+      "scenario": "maximum and minimum stated confidence side by side",
+      "subject": "0x100000f00",
+      "transcript_id": "08-confidence-extremes",
+      "unsupported_factual_claims": 0,
+      "valid_citations": 2
+    }
+  ]
+}
