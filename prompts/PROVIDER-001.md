@@ -45,6 +45,9 @@ These are settled; do not re-litigate them in the implementation.
 - **`store=False`.**
 - **No tools, no streaming**, no web/search/file capability. One completion
   request in, text response out.
+- **Transport retries disabled for baseline capture.** Configure the official
+  client with `max_retries=0`, or the equivalent per-request setting. "One
+  completion request" must mean one outbound attempt.
 - The **exact model identifier** used must be recorded in the `ModelResponse` so
   it can reach every frozen transcript.
 - The first committed baseline should use a **pinned GPT-5.6 Sol snapshot** if
@@ -66,7 +69,20 @@ These are settled; do not re-litigate them in the implementation.
 5. **Failure is a value.** A refused request, a timeout, or an unusable reply
    arrives through the existing `ModelUnavailableError` path so `investigate`
    records it instead of crashing.
-6. **Request construction is testable without a network.** The reply is not
+6. **One attempt means one attempt.** The SDK's own retry loop is off
+   (`max_retries=0`). A timeout, a rate limit, or a server error flows through
+   the failure path above and is frozen and reported by `BASELINE-AGENT-001`,
+   rather than being silently absorbed by a retry nobody recorded. A hidden
+   second attempt makes the capture a sample of the best of several tries while
+   the transcript claims it was one.
+
+   Model-level retries stay forbidden as already specified: the agent does not
+   re-ask a model that answered badly.
+
+   This does not forbid a deliberately started replacement run after a transport
+   failure - `BASELINE-AGENT-001` already requires such a rerun to be recorded.
+   It forbids invisible retries inside one supposedly singular attempt.
+7. **Request construction is testable without a network.** The reply is not
    reproducible and is not expected to be; that is why it later gets frozen.
 
 ## Deliverables
