@@ -41,9 +41,9 @@ def canonical_digest(payload: Any) -> str:
     return hashlib.sha256(rendered.encode("utf-8")).hexdigest()[:16]
 
 
-def subject_tag(subject: str) -> str:
-    """The subject, as it appears inside an evidence key."""
-    return subject[2:] if subject.startswith("0x") else subject
+#: Persistent evidence keys are content-derived. Sixteen hex characters
+#: identifies a fact; it is not a defence against a constructed collision.
+EVIDENCE_KEY_LENGTH = 16
 
 
 class SupportLevel(StrEnum):
@@ -77,8 +77,27 @@ class Fact:
 
     @property
     def evidence_key(self) -> str:
-        """Globally unique within a binary. Two subjects never collide."""
-        return f"E-{subject_tag(self.subject)}-{self.id}"
+        """Persistent identity, derived from what the fact *is*.
+
+        Deliberately not built from `id`. The local ordinal describes a
+        position in one sheet, and positions move: if a tool is refused on a
+        later run, the fact behind it slides up and inherits the vacated slot.
+        A key built on that would silently name a different observation while
+        looking unchanged, which is the worst possible failure for a store whose
+        whole purpose is that evidence is immutable.
+
+        Subject, tool, arguments, result digest and summary are all included, so
+        two facts differ in the key exactly when they differ in substance.
+        """
+        payload = {
+            "subject": self.subject,
+            "tool": self.tool,
+            "arguments": self.arguments,
+            "result_digest": self.result_digest,
+            "summary": self.summary,
+        }
+        rendered = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
+        return "E-" + hashlib.sha256(rendered.encode("utf-8")).hexdigest()[:EVIDENCE_KEY_LENGTH]
 
     def as_dict(self) -> dict[str, Any]:
         return {

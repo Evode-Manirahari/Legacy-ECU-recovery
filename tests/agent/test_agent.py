@@ -24,6 +24,7 @@ from agent_support import (
 
 from ecu_recovery.agent import (
     Citation,
+    Fact,
     InvestigationBudget,
     ReplyFormatError,
     SupportLevel,
@@ -45,6 +46,11 @@ from ecu_recovery.tools import ToolContext
 
 def reply(*claims: dict[str, object]) -> str:
     return json.dumps({"claims": list(claims)})
+
+
+def sheet_for(subject: str):  # type: ignore[no-untyped-def]
+    """A fact sheet from a clean session, for reading expected keys."""
+    return gather_facts(fake_context(), subject)
 
 
 # --- the model boundary ---
@@ -425,7 +431,7 @@ def test_claims_map_onto_hypotheses_the_evidence_model_accepts() -> None:
         Certainty.UNKNOWN,
     ]
     assert paired[0][0].confidence == 0.8
-    assert paired[0][1] == (f"E-{SUBJECT[2:]}-F001",)
+    assert paired[0][1] == (sheet_for(SUBJECT).facts[1].evidence_key,)
     assert paired[2][1] == ()
 
 
@@ -610,7 +616,7 @@ def test_no_claim_of_any_support_level_maps_to_known() -> None:
 
 
 def test_two_subjects_produce_disjoint_evidence_keys() -> None:
-    """Fact ids restart per sheet; evidence keys must not, or persistence collides."""
+    """Fact ids restart per sheet; persistent keys must not collide."""
     context = fake_context()
     first = gather_facts(context, SUBJECT)
     second = gather_facts(context, function_id_for(0x2000))
@@ -620,7 +626,8 @@ def test_two_subjects_produce_disjoint_evidence_keys() -> None:
 
     assert first_keys and second_keys
     assert first_keys.isdisjoint(second_keys)
-    # The compact per-sheet ids are still shared, which is why scoping matters.
+    # The compact per-sheet ids are still shared, which is why the persistent
+    # key cannot be built from them.
     assert {item.id for item in first.facts} & {item.id for item in second.facts}
 
 
@@ -629,6 +636,99 @@ def test_evidence_keys_are_deterministic_across_runs() -> None:
     second = {item.key for item in to_evidence(gather_facts(fake_context(), SUBJECT))}
 
     assert first == second
+
+
+def test_a_shifted_ordinal_does_not_reuse_a_persistent_key() -> None:
+    """The defect this key construction exists for.
+
+    Run A gathers `get_callers` at F003. In run B that call is refused, so
+    `get_callees` slides up into the vacated slot and is also F003. A key built
+    from subject and ordinal would give the two the same identity - the store
+    would believe one immutable observation had been recorded, when in fact two
+    different tools produced two different results.
+    """
+    run_a = gather_facts(fake_context(), SUBJECT)
+    run_b = gather_facts(fake_context(failing_tool="get_callers"), SUBJECT)
+
+    a_at_slot = run_a.by_id("F003")
+    b_at_slot = run_b.by_id("F003")
+    assert a_at_slot is not None and b_at_slot is not None
+    assert a_at_slot.id == b_at_slot.id == "F003"
+    assert a_at_slot.tool == "get_callers"
+    assert b_at_slot.tool == "get_callees"
+
+    assert a_at_slot.evidence_key != b_at_slot.evidence_key
+    # Note what is *not* asserted here: run A also observed get_callees, with
+    # identical content, so it holds that key too. That is correct. Identity
+    # follows the observation, not the run it appeared in, and asserting the
+    # two runs share no keys would be asserting the opposite.
+
+
+def test_the_same_fact_keeps_its_key_even_when_its_ordinal_moves() -> None:
+    """The other half: identity follows the observation, not the position."""
+    run_a = gather_facts(fake_context(), SUBJECT)
+    run_b = gather_facts(fake_context(failing_tool="get_callers"), SUBJECT)
+
+    callees_a = next(item for item in run_a.facts if item.tool == "get_callees")
+    callees_b = next(item for item in run_b.facts if item.tool == "get_callees")
+
+    assert callees_a.id != callees_b.id, "the ordinal must actually have moved"
+    assert callees_a.evidence_key == callees_b.evidence_key
+
+
+def test_the_same_ordinal_with_a_different_tool_gives_a_different_key() -> None:
+    sheet = sheet_for(SUBJECT)
+    one, two = sheet.facts[3], sheet.facts[4]
+
+    assert one.tool != two.tool
+    assert one.evidence_key != two.evidence_key
+
+
+def test_the_same_tool_with_different_arguments_gives_a_different_key() -> None:
+    sheet = sheet_for(SUBJECT)
+    base = sheet.facts[3]
+    other = Fact(
+        id=base.id,
+        tool=base.tool,
+        arguments={**base.arguments, "limit": base.arguments.get("limit", 0) + 1},
+        subject=base.subject,
+        summary=base.summary,
+        result_digest=base.result_digest,
+    )
+
+    assert base.evidence_key != other.evidence_key
+
+
+def test_the_same_call_with_a_different_result_gives_a_different_key() -> None:
+    """Two runs, same question, different answer: two observations, not one."""
+    sheet = sheet_for(SUBJECT)
+    base = sheet.facts[3]
+    moved = Fact(
+        id=base.id,
+        tool=base.tool,
+        arguments=dict(base.arguments),
+        subject=base.subject,
+        summary=base.summary,
+        result_digest="0000000000000000",
+    )
+
+    assert base.evidence_key != moved.evidence_key
+
+
+def test_evidence_keys_are_unique_within_one_sheet() -> None:
+    sheet = sheet_for(SUBJECT)
+
+    keys = [item.evidence_key for item in sheet.facts]
+
+    assert len(set(keys)) == len(keys)
+
+
+def test_a_persistent_key_is_not_built_from_the_local_ordinal() -> None:
+    """Stated directly, so a future refactor cannot reintroduce it quietly."""
+    sheet = sheet_for(SUBJECT)
+
+    for fact in sheet.facts:
+        assert fact.id not in fact.evidence_key
 
 
 def test_to_evidence_and_to_hypotheses_agree_on_every_key() -> None:
@@ -652,4 +752,4 @@ def test_to_evidence_and_to_hypotheses_agree_on_every_key() -> None:
 
     assert keys
     assert set(keys) <= available
-    assert keys[0].startswith(f"E-{SUBJECT[2:]}-")
+    assert keys[0] == sheet.facts[1].evidence_key
