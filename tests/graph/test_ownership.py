@@ -105,6 +105,43 @@ def test_prompt_contracts_restate_the_canonical_paths() -> None:
             assert path in contract, f"{node.prompt} does not mention {path!r}"
 
 
+#: The scorer's own fixture corpus. It exists to prove the detector finds
+#: planted defects, and every reply in it is scripted.
+AUTHORED_CORPUS = "tests/evaluation/agent/transcripts/**"
+
+
+def test_the_gate_names_the_baseline_it_scores() -> None:
+    """`GATE-AGENT-MVP` owns no paths, so it must name the ones it reads.
+
+    The gate is the one node whose evidence is not its own ownership, which
+    means nothing else here would notice it drifting onto a different corpus.
+    Its sources are derived from the nodes that produce them, so renaming a
+    baseline tree in the graph breaks this until the gate contract follows.
+
+    The authored corpus is named too, as an exclusion: the failure mode this
+    guards against is not a gate that reads nothing, it is a gate that quietly
+    falls back to the fixtures that were always going to pass.
+    """
+    graph = load_graph()
+    repository = Path(__file__).resolve().parents[2]
+    contract = (repository / str(graph.node("GATE-AGENT-MVP").prompt)).read_text(encoding="utf-8")
+
+    transcripts = [
+        path for path in graph.node("BASELINE-AGENT-001").allowed_paths if "transcripts" in path
+    ]
+    reviews = list(graph.node("REVIEW-AGENT-BASELINE-001").allowed_paths)
+    assert transcripts, "BASELINE-AGENT-001 owns no transcript tree for the gate to score"
+    assert reviews, "REVIEW-AGENT-BASELINE-001 owns no review tree for the gate to read"
+
+    for path in (*transcripts, *reviews):
+        assert path in contract, f"GATE-AGENT-MVP does not name its evidence source {path!r}"
+
+    assert AUTHORED_CORPUS in contract, (
+        "GATE-AGENT-MVP must name the authored corpus to exclude it by name"
+    )
+    assert "REVIEW-AGENT-BASELINE-001" in graph.node("GATE-AGENT-MVP").depends_on
+
+
 # --- the rule, on synthetic graphs ---
 
 
