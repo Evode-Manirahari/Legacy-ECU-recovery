@@ -38,6 +38,7 @@ from ecu_recovery.agent import (
     to_evidence,
     to_hypotheses,
 )
+from ecu_recovery.agent.models import canonical_digest
 from ecu_recovery.agent.provider import ModelProvider, ModelUnavailableError
 from ecu_recovery.analysis.models import function_id_for
 from ecu_recovery.models import Certainty
@@ -753,3 +754,67 @@ def test_to_evidence_and_to_hypotheses_agree_on_every_key() -> None:
     assert keys
     assert set(keys) <= available
     assert keys[0] == sheet.facts[1].evidence_key
+
+
+# --- digest strength ---
+
+
+def test_a_result_digest_is_a_full_sha256() -> None:
+    """Truncating this traded collision resistance for nothing anyone reads.
+
+    The digest decides whether a replayed call still reproduces its fact. A
+    shortened hash makes two different results collide sooner, and the field is
+    never parsed by a person, so the shorter form bought no legibility.
+    """
+    sheet = sheet_for(SUBJECT)
+
+    for fact in sheet.facts:
+        assert len(fact.result_digest) == 64, fact.result_digest
+        assert set(fact.result_digest) <= set("0123456789abcdef")
+
+
+def test_a_persistent_evidence_key_is_a_full_sha256() -> None:
+    sheet = sheet_for(SUBJECT)
+
+    for fact in sheet.facts:
+        assert fact.evidence_key.startswith("E-")
+        digest = fact.evidence_key[2:]
+        assert len(digest) == 64, fact.evidence_key
+        assert set(digest) <= set("0123456789abcdef")
+
+
+def test_the_digest_matches_sha256_of_the_canonical_form() -> None:
+    """Pinned against hashlib directly, so a future prefix cannot creep back."""
+    import hashlib
+    import json as _json
+
+    payload = {"b": 2, "a": [1, {"z": 0}]}
+    expected = hashlib.sha256(
+        _json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+    ).hexdigest()
+
+    assert canonical_digest(payload) == expected
+    assert len(expected) == 64
+
+
+def test_evidence_keys_carry_no_truncated_prefix() -> None:
+    sheet = sheet_for(SUBJECT)
+    evidence = to_evidence(sheet)
+
+    assert evidence
+    for item in evidence:
+        assert len(item.key) == 66, item.key  # "E-" plus 64 hex characters
+
+
+def test_prompt_facing_citation_ids_stay_compact() -> None:
+    """The model copies these; the digests are database identity it never sees."""
+    sheet = sheet_for(SUBJECT)
+
+    assert [item.id for item in sheet.facts] == [
+        f"F{index:03d}" for index in range(len(sheet.facts))
+    ]
+    rendered = render_fact_sheet(sheet)
+    for fact in sheet.facts:
+        assert fact.id in rendered
+        assert fact.evidence_key not in rendered
+        assert fact.result_digest not in rendered
