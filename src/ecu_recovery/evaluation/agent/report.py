@@ -9,11 +9,23 @@ measurement and a misleading artifact.
 
 from __future__ import annotations
 
-from .models import SCHEMA_VERSION, AgentEvaluationRun
+from .models import SCHEMA_VERSION, AgentEvaluationRun, Measurement
 
 
 def _status(ok: bool) -> str:
     return "PASS" if ok else "FAIL"
+
+
+def _coverage(measurement: Measurement) -> str:
+    """How much of the corpus a semantic number actually rests on.
+
+    Published beside every adjudicated metric because a ratio carries its own
+    denominator but not its coverage: "2/3 correct" says nothing about the
+    twenty-seven subjects nobody read.
+    """
+    if measurement.coverage is None:
+        return "—"
+    return measurement.coverage.render()
 
 
 def render_report(run: AgentEvaluationRun) -> str:
@@ -97,15 +109,18 @@ def render_report(run: AgentEvaluationRun) -> str:
         "compute a number to verify the scorer and nothing more. A metric nobody",
         "qualified has judged reports UNMEASURED rather than a flattering zero.",
         "",
-        "| Metric | Value | Provenance | Note |",
-        "|---|---|---|---|",
+        "| Metric | Value | Adjudicated | Provenance | Note |",
+        "|---|---|---|---|---|",
         f"| classification_accuracy | {metrics.classification_accuracy.render()} | "
+        f"{_coverage(metrics.classification_accuracy)} | "
         f"{metrics.classification_accuracy.provenance} | "
         f"{metrics.classification_accuracy.reason or 'one verdict per subject'} |",
         f"| confidence_calibration (ECE) | {metrics.confidence_calibration.render()} | "
+        f"{_coverage(metrics.confidence_calibration)} | "
         f"{metrics.confidence_calibration.provenance} | "
         f"{metrics.confidence_calibration.reason} |",
         f"| critical_unsupported_claims | {metrics.critical_unsupported_claims.render()} | "
+        f"{_coverage(metrics.critical_unsupported_claims)} | "
         f"{metrics.critical_unsupported_claims.provenance} | "
         f"{metrics.critical_unsupported_claims.reason or 'critical AND unsupported'} |",
         "",
@@ -146,7 +161,8 @@ def render_report(run: AgentEvaluationRun) -> str:
             "Expected calibration error: the size-weighted mean gap between stated",
             "confidence and adjudicated correctness. Zero is perfect. This is not an",
             "accuracy rate — two runs can be right equally often and differ entirely",
-            "here.",
+            "here. Only claims whose correctness met the required review strength",
+            "enter the bands; the adjudicated count is in the table above.",
             "",
             "| Confidence | Claims | Correct | Mean stated | Accuracy | Gap |",
             "|---|---:|---:|---:|---:|---:|",

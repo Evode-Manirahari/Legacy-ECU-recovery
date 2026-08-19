@@ -200,6 +200,15 @@ _NO_QUORUM = (
     "fewer than two distinct human reviewers; authored labels verify the scorer "
     "and never satisfy review quorum"
 )
+_NO_QUORUM_CLASSIFICATION = (
+    "no subject was classified by two distinct human reviewers in agreement; "
+    "reviewer presence on a transcript is not field-level quorum, and an "
+    "abstention is not agreement"
+)
+_NO_QUORUM_SUPPORT = (
+    "no claim had its semantic correctness adjudicated by two distinct human "
+    "reviewers in agreement; a single opinion is not two-reviewer correctness"
+)
 
 
 def _provenance(panel: ReviewPanel, transcript_ids: list[str]) -> str:
@@ -291,37 +300,73 @@ def critical_unsupported_claims(
     )
 
 
+def _semantic_mode(panel: ReviewPanel) -> tuple[bool, str]:
+    """Which strength of verdict a semantic metric may consume, and under what name.
+
+    A panel of humans is held to field-level quorum: every verdict entering a
+    result labelled `human-quorum` must itself have been adjudicated by two
+    distinct humans who agreed. Anything weaker would let one person's judgement
+    wear a two-reviewer label because somebody else filed elsewhere on the same
+    transcript.
+
+    Authored panels fall back to the weak notion deliberately. They exist to
+    exercise the scorer against known labels, and they say so in the provenance
+    rather than in the strength of the claim.
+    """
+    if panel.fully_human:
+        return True, "human-quorum"
+    return False, "authored"
+
+
 def classification_accuracy(transcripts: tuple[Transcript, ...], panel: ReviewPanel) -> Measurement:
     """One verdict per subject, not one per claim.
 
     A function that provoked five claims must not outvote one that provoked a
     single claim; the question is whether the function was identified, and there
     is exactly one answer to it per function.
+
+    Partial coverage is acceptable here in a way it is not for a count, because
+    the ratio carries its own denominator. What is published alongside is how
+    many subjects were judged at all, so "2/3 correct" cannot be mistaken for a
+    verdict on a corpus of thirty.
     """
+    require_quorum, provenance = _semantic_mode(panel)
     correct = 0
     judged = 0
     for transcript in transcripts:
         verdict = panel.classification(transcript.id)
-        if not verdict.settled:
+        usable = verdict.human_quorum if require_quorum else verdict.settled
+        if not usable:
             continue
         judged += 1
         correct += 1 if verdict.value else 0
     if judged == 0:
-        return Measurement.unmeasured("classification_accuracy", _NO_REVIEW)
-    ids = [item.id for item in transcripts]
-    provenance = _provenance(panel, ids)
+        return Measurement.unmeasured(
+            "classification_accuracy",
+            _NO_QUORUM_CLASSIFICATION if require_quorum else _NO_REVIEW,
+        )
     return Measurement(
         "classification_accuracy",
         ratio=Ratio(correct, judged),
+        coverage=Ratio(judged, len(transcripts)),
         provenance=provenance,
         reason="" if provenance == "human-quorum" else _NO_QUORUM,
     )
 
 
 def calibration_buckets(
-    transcripts: tuple[Transcript, ...], panel: ReviewPanel
+    transcripts: tuple[Transcript, ...],
+    panel: ReviewPanel,
+    require_quorum: bool | None = None,
 ) -> tuple[CalibrationBucket, ...]:
-    """Stated confidence against adjudicated correctness, per band."""
+    """Stated confidence against adjudicated correctness, per band.
+
+    Only claims whose correctness verdict meets the required strength enter the
+    bands. A single human opinion is not two-reviewer correctness merely because
+    a colleague filed on the same transcript.
+    """
+    if require_quorum is None:
+        require_quorum, _ = _semantic_mode(panel)
     buckets: list[CalibrationBucket] = []
     for lower, upper in _BUCKETS:
         confidences: list[float] = []
@@ -329,7 +374,8 @@ def calibration_buckets(
         for transcript in transcripts:
             for index, claim in enumerate(transcript.claims):
                 verdict = panel.claim_support(transcript.id, index)
-                if not verdict.settled:
+                usable = verdict.human_quorum if require_quorum else verdict.settled
+                if not usable:
                     continue
                 confidence = float(claim.get("confidence", 0.0))
                 inside = lower <= confidence < upper or (upper == 1.0 and confidence == 1.0)
@@ -358,21 +404,26 @@ def confidence_calibration(transcripts: tuple[Transcript, ...], panel: ReviewPan
     Accuracy is not calibration. Two corpora can be right equally often and be
     utterly different here: one that says 0.9 when it is right and 0.1 when it is
     wrong is well calibrated, and one that says the reverse is not, though both
-    score fifty percent. Publishing a correctness rate under this name would
-    hide exactly that difference.
+    score fifty percent.
 
-    Zero is perfect. Requires adjudicated semantic correctness.
+    Zero is perfect. Every correctness label behind it must meet the strength
+    the provenance claims, and the adjudicated claim count is published so a
+    partially reviewed subset cannot read as the whole corpus.
     """
-    buckets = calibration_buckets(transcripts, panel)
+    require_quorum, provenance = _semantic_mode(panel)
+    buckets = calibration_buckets(transcripts, panel, require_quorum)
     if not buckets:
-        return Measurement.unmeasured("confidence_calibration", _NO_REVIEW)
+        return Measurement.unmeasured(
+            "confidence_calibration",
+            _NO_QUORUM_SUPPORT if require_quorum else _NO_REVIEW,
+        )
     total_claims = sum(item.claims for item in buckets)
+    available = sum(len(transcript.claims) for transcript in transcripts)
     ece = sum(item.claims * abs(item.gap) for item in buckets) / total_claims
-    ids = [item.id for item in transcripts]
-    provenance = _provenance(panel, ids)
     return Measurement(
         "confidence_calibration",
         value=round(ece, 6),
+        coverage=Ratio(total_claims, available),
         provenance=provenance,
         reason=(
             "expected calibration error over adjudicated semantic correctness; 0 is perfect"

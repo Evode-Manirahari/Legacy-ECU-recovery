@@ -585,14 +585,20 @@ def test_authored_labels_never_satisfy_quorum() -> None:
     assert authored.fully_human is False
 
 
-def test_a_single_human_reviewer_is_not_enough_for_a_gate_eligible_metric() -> None:
+def test_a_single_human_reviewer_is_not_enough_for_a_semantic_metric() -> None:
+    """Stricter than it once was, and deliberately.
+
+    This used to compute a number and mark it non-eligible. A lone human review
+    is an unfinished review, not a weaker measurement, so the metric now
+    declines to produce a figure at all.
+    """
     transcripts = (one_claim(),)
     panel = panel_of(human("t", "reviewer-a", classification=True, supported=True, critical=False))
 
     measurement = classification_accuracy(transcripts, panel)
 
-    assert measurement.measured is True  # a number exists
-    assert measurement.gate_eligible is False  # but it cannot pass a gate
+    assert measurement.measured is False
+    assert measurement.gate_eligible is False
     assert "two distinct human reviewers" in measurement.reason
 
 
@@ -1039,3 +1045,183 @@ def test_duplicate_reviewer_protection_still_holds(tmp_path: Path) -> None:
 
     with pytest.raises(AdjudicationError, match="twice"):
         load_panel(tmp_path)
+
+
+# --- the same rule, applied to the semantic ratios ---
+
+
+def semantic_review(
+    reviewer: str,
+    classification: bool | None,
+    supported: bool | None,
+    kind: str = "human",
+) -> Review:
+    return Review(
+        transcript_id="t",
+        reviewer=reviewer,
+        kind=kind,
+        classification_correct=classification,
+        judgements=(
+            ClaimJudgement(claim_index=0, semantically_supported=supported, critical=False),
+        ),
+    )
+
+
+def confident_claim(transcript_id: str = "t", confidence: float = 0.9) -> Transcript:
+    return one_claim(transcript_id, confidence)
+
+
+def test_one_human_classifying_while_another_abstains_is_not_quorum() -> None:
+    """A colleague filing on the transcript is not a second opinion on the subject."""
+    panel = panel_of(
+        semantic_review("reviewer-a", classification=True, supported=True),
+        semantic_review("reviewer-b", classification=None, supported=None),
+    )
+
+    measurement = classification_accuracy((confident_claim(),), panel)
+
+    assert measurement.measured is False
+    assert measurement.gate_eligible is False
+    assert "abstention is not agreement" in measurement.reason
+
+
+def test_two_humans_classifying_in_agreement_are_included() -> None:
+    panel = panel_of(
+        semantic_review("reviewer-a", classification=True, supported=True),
+        semantic_review("reviewer-b", classification=True, supported=True),
+    )
+
+    measurement = classification_accuracy((confident_claim(),), panel)
+
+    assert measurement.measured is True
+    assert measurement.ratio == Ratio(1, 1)
+    assert measurement.provenance == "human-quorum"
+    assert measurement.gate_eligible is True
+
+
+def test_two_humans_disagreeing_on_classification_are_excluded() -> None:
+    panel = panel_of(
+        semantic_review("reviewer-a", classification=True, supported=True),
+        semantic_review("reviewer-b", classification=False, supported=True),
+    )
+
+    assert panel.classification("t").disagreed is True
+    assert classification_accuracy((confident_claim(),), panel).measured is False
+
+
+def test_one_human_supporting_while_another_abstains_cannot_enter_ece() -> None:
+    panel = panel_of(
+        semantic_review("reviewer-a", classification=True, supported=True),
+        semantic_review("reviewer-b", classification=True, supported=None),
+    )
+
+    measurement = confidence_calibration((confident_claim(),), panel)
+
+    assert measurement.measured is False
+    assert "single opinion is not two-reviewer correctness" in measurement.reason
+    # ...while classification, which two humans did adjudicate, is unaffected.
+    assert classification_accuracy((confident_claim(),), panel).provenance == "human-quorum"
+
+
+def test_two_humans_supporting_in_agreement_may_enter_ece() -> None:
+    panel = panel_of(
+        semantic_review("reviewer-a", classification=True, supported=True),
+        semantic_review("reviewer-b", classification=True, supported=True),
+    )
+
+    measurement = confidence_calibration((confident_claim(confidence=0.9),), panel)
+
+    assert measurement.measured is True
+    assert measurement.provenance == "human-quorum"
+    assert measurement.value == pytest.approx(0.1, abs=1e-6)
+
+
+def test_authored_reviews_still_compute_both_semantic_metrics() -> None:
+    """Scorer verification survives the stricter rule, and stays non-eligible."""
+    panel = panel_of(
+        semantic_review("authored-a", classification=True, supported=True, kind="authored"),
+        semantic_review("authored-b", classification=True, supported=True, kind="authored"),
+    )
+
+    classification = classification_accuracy((confident_claim(),), panel)
+    calibration = confidence_calibration((confident_claim(),), panel)
+
+    assert classification.measured is True and classification.provenance == "authored"
+    assert calibration.measured is True and calibration.provenance == "authored"
+    assert classification.gate_eligible is False
+    assert calibration.gate_eligible is False
+
+
+def test_every_datum_behind_a_human_quorum_metric_has_field_level_quorum() -> None:
+    """The invariant, asserted over the data rather than trusted to the code path.
+
+    Two subjects: one adjudicated by two humans, one where the second abstained.
+    The included subject must carry field-level quorum, the excluded one must
+    not, and the published coverage must show that only half the corpus was read.
+    """
+    judged, unjudged = confident_claim("judged"), confident_claim("unjudged")
+    panel = panel_of(
+        Review(
+            "judged",
+            "reviewer-a",
+            kind="human",
+            classification_correct=True,
+            judgements=(ClaimJudgement(0, semantically_supported=True, critical=False),),
+        ),
+        Review(
+            "judged",
+            "reviewer-b",
+            kind="human",
+            classification_correct=True,
+            judgements=(ClaimJudgement(0, semantically_supported=True, critical=False),),
+        ),
+        Review(
+            "unjudged",
+            "reviewer-a",
+            kind="human",
+            classification_correct=True,
+            judgements=(ClaimJudgement(0, semantically_supported=True, critical=False),),
+        ),
+        Review(
+            "unjudged",
+            "reviewer-b",
+            kind="human",
+            classification_correct=None,
+            judgements=(ClaimJudgement(0, semantically_supported=None, critical=None),),
+        ),
+    )
+    transcripts = (judged, unjudged)
+
+    measurement = classification_accuracy(transcripts, panel)
+
+    assert measurement.provenance == "human-quorum"
+    assert measurement.ratio == Ratio(1, 1)
+    assert measurement.coverage == Ratio(1, 2), "coverage must show the unread half"
+
+    included = [item for item in transcripts if panel.classification(item.id).human_quorum]
+    excluded = [item for item in transcripts if not panel.classification(item.id).human_quorum]
+    assert [item.id for item in included] == ["judged"]
+    assert [item.id for item in excluded] == ["unjudged"]
+    for item in included:
+        assert panel.classification(item.id).human_quorum is True
+
+    calibration = confidence_calibration(transcripts, panel)
+    assert calibration.coverage == Ratio(1, 2)
+    for item in transcripts:
+        entered = panel.claim_support(item.id, 0).human_quorum
+        assert entered == (item.id == "judged")
+
+
+def test_transcript_presence_alone_never_produces_a_human_quorum_semantic_metric() -> None:
+    """The invariant restated for the ratios, matching the count."""
+    panel = panel_of(
+        semantic_review("reviewer-a", classification=True, supported=True),
+        semantic_review("reviewer-b", classification=None, supported=None),
+    )
+
+    assert panel.has_quorum("t") is True  # two reviewers filed
+    assert panel.classification("t").settled is True  # weak reconciliation holds
+    assert panel.classification("t").human_quorum is False  # but only one classified
+
+    assert classification_accuracy((confident_claim(),), panel).measured is False
+    assert confidence_calibration((confident_claim(),), panel).measured is False

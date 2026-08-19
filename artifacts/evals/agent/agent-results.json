@@ -161,6 +161,12 @@
     ],
     "classification_accuracy": {
       "count": null,
+      "coverage": {
+        "denominator": 8,
+        "numerator": 5,
+        "percent": 62.5,
+        "rate": 0.625
+      },
       "gate_eligible": false,
       "measured": true,
       "name": "classification_accuracy",
@@ -182,6 +188,12 @@
     },
     "confidence_calibration": {
       "count": null,
+      "coverage": {
+        "denominator": 9,
+        "numerator": 7,
+        "percent": 77.7778,
+        "rate": 0.7777777777777778
+      },
       "gate_eligible": false,
       "measured": true,
       "name": "confidence_calibration",
@@ -192,6 +204,7 @@
     },
     "critical_unsupported_claims": {
       "count": null,
+      "coverage": null,
       "gate_eligible": false,
       "measured": false,
       "name": "critical_unsupported_claims",

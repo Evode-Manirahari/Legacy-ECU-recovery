@@ -60,11 +60,11 @@ so only a reconciled two-human verdict is gate-eligible; authored labels
 compute a number to verify the scorer and nothing more. A metric nobody
 qualified has judged reports UNMEASURED rather than a flattering zero.
 
-| Metric | Value | Provenance | Note |
-|---|---|---|---|
-| classification_accuracy | 40.0% (2/5) | authored | fewer than two distinct human reviewers; authored labels verify the scorer and never satisfy review quorum |
-| confidence_calibration (ECE) | 0.2857 | authored | fewer than two distinct human reviewers; authored labels verify the scorer and never satisfy review quorum |
-| critical_unsupported_claims | UNMEASURED | none | 2 claim(s) lack a reconciled verdict on support or criticality, 1 of them disputed between reviewers; a count over an incompletely judged corpus would read as 'there are none' when it means 'nobody looked' |
+| Metric | Value | Adjudicated | Provenance | Note |
+|---|---|---|---|---|
+| classification_accuracy | 40.0% (2/5) | 62.5% (5/8) | authored | fewer than two distinct human reviewers; authored labels verify the scorer and never satisfy review quorum |
+| confidence_calibration (ECE) | 0.2857 | 77.7778% (7/9) | authored | fewer than two distinct human reviewers; authored labels verify the scorer and never satisfy review quorum |
+| critical_unsupported_claims | UNMEASURED | — | none | 2 claim(s) lack a reconciled verdict on support or criticality, 1 of them disputed between reviewers; a count over an incompletely judged corpus would read as 'there are none' when it means 'nobody looked' |
 
 ## Diagnostics — not the metrics above
 
@@ -91,7 +91,8 @@ on purpose. Real confidence calibration stays unmeasured above.
 Expected calibration error: the size-weighted mean gap between stated
 confidence and adjudicated correctness. Zero is perfect. This is not an
 accuracy rate — two runs can be right equally often and differ entirely
-here.
+here. Only claims whose correctness met the required review strength
+enter the bands; the adjudicated count is in the table above.
 
 | Confidence | Claims | Correct | Mean stated | Accuracy | Gap |
 |---|---:|---:|---:|---:|---:|

@@ -43,6 +43,11 @@ class Measurement:
     value: float | None = None
     measured: bool = True
     reason: str = ""
+    #: Adjudicated units over available units. A ratio publishes its own
+    #: denominator, but "3/5 subjects correct" does not say how many subjects
+    #: went unjudged, and a partial semantic measurement must not read as a
+    #: full-corpus one.
+    coverage: Ratio | None = None
     #: How the judgement behind this number was obtained. Only a reconciled
     #: two-reviewer verdict may satisfy a gate; an authored label can compute a
     #: number for testing the scorer and nothing more.
@@ -75,6 +80,7 @@ class Measurement:
             "ratio": None if self.ratio is None else self.ratio.as_dict(),
             "count": self.count,
             "value": self.value,
+            "coverage": None if self.coverage is None else self.coverage.as_dict(),
         }
 
 
