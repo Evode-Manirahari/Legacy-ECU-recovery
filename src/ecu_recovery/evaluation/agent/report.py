@@ -90,20 +90,24 @@ def render_report(run: AgentEvaluationRun) -> str:
         "checking, not the reasoning. A fabricated citation reaching a surviving",
         "claim is a failure of the mechanism, and there is no acceptable rate for it.",
         "",
-        "## Not measured",
+        "## Adjudicated metrics",
         "",
-        "These need semantic adjudication. None is reported as a number until a",
-        "reviewer supplies one, because a metric nobody computed must not read like",
-        "a metric that came out well.",
+        "These need semantic judgement. `EVALS.md` requires two blinded reviewers,",
+        "so only a reconciled two-human verdict is gate-eligible; authored labels",
+        "compute a number to verify the scorer and nothing more. A metric nobody",
+        "qualified has judged reports UNMEASURED rather than a flattering zero.",
         "",
-        "| Metric | State | Why |",
-        "|---|---|---|",
+        "| Metric | Value | Provenance | Note |",
+        "|---|---|---|---|",
         f"| classification_accuracy | {metrics.classification_accuracy.render()} | "
-        f"{metrics.classification_accuracy.reason} |",
-        f"| confidence_calibration | {metrics.confidence_calibration.render()} | "
+        f"{metrics.classification_accuracy.provenance} | "
+        f"{metrics.classification_accuracy.reason or 'one verdict per subject'} |",
+        f"| confidence_calibration (ECE) | {metrics.confidence_calibration.render()} | "
+        f"{metrics.confidence_calibration.provenance} | "
         f"{metrics.confidence_calibration.reason} |",
         f"| critical_unsupported_claims | {metrics.critical_unsupported_claims.render()} | "
-        f"{metrics.critical_unsupported_claims.reason} |",
+        f"{metrics.critical_unsupported_claims.provenance} | "
+        f"{metrics.critical_unsupported_claims.reason or 'critical AND unsupported'} |",
         "",
         "## Diagnostics — not the metrics above",
         "",
@@ -134,6 +138,35 @@ def render_report(run: AgentEvaluationRun) -> str:
     else:
         lines.append("No factual claims carried confidence, so this is undefined here.")
 
+    if metrics.calibration_buckets:
+        lines += [
+            "",
+            "## Confidence calibration (ECE)",
+            "",
+            "Expected calibration error: the size-weighted mean gap between stated",
+            "confidence and adjudicated correctness. Zero is perfect. This is not an",
+            "accuracy rate — two runs can be right equally often and differ entirely",
+            "here.",
+            "",
+            "| Confidence | Claims | Correct | Mean stated | Accuracy | Gap |",
+            "|---|---:|---:|---:|---:|---:|",
+        ]
+        for band in metrics.calibration_buckets:
+            lines.append(
+                f"| {band.lower:.2f}–{band.upper:.2f} | {band.claims} | "
+                f"{band.correct} | {band.mean_confidence:.3f} | "
+                f"{band.accuracy:.3f} | {band.gap:+.3f} |"
+            )
+    if metrics.review_disagreements:
+        lines += [
+            "",
+            "## Reviewer disagreements — left unresolved on purpose",
+            "",
+            "Where reviewers differ the label is not settled by picking one or by",
+            "averaging. The claim stays unjudged and the disagreement is recorded.",
+            "",
+        ]
+        lines += [f"- {item}" for item in metrics.review_disagreements]
     lines += [
         "",
         "## Per transcript",

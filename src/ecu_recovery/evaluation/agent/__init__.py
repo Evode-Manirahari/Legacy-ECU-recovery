@@ -17,14 +17,26 @@ stopped being a measurement.
 
 from __future__ import annotations
 
+from .adjudication import (
+    REQUIRED_HUMAN_REVIEWERS,
+    AdjudicationError,
+    ClaimJudgement,
+    Review,
+    ReviewPanel,
+    Verdict,
+    load_panel,
+    parse_review,
+)
 from .gate import GATE_TARGETS, AgentGateCheck, check_gate
 from .models import (
     FACTUAL_SUPPORT,
     SCHEMA_VERSION,
     AgentEvaluationRun,
     AgentMetrics,
+    CalibrationBucket,
     ClassificationScore,
     ConfidenceBucket,
+    Measurement,
     Provenance,
     TranscriptScore,
 )
@@ -32,7 +44,11 @@ from .report import render_report
 from .runner import evaluate
 from .scoring import (
     aggregate,
+    calibration_buckets,
+    classification_accuracy,
     confidence_buckets,
+    confidence_calibration,
+    critical_unsupported_claims,
     expected_roles,
     score_classification,
     score_transcript,
@@ -46,6 +62,20 @@ from .transcripts import (
 )
 
 __all__ = [
+    "parse_review",
+    "load_panel",
+    "critical_unsupported_claims",
+    "confidence_calibration",
+    "classification_accuracy",
+    "calibration_buckets",
+    "Verdict",
+    "ReviewPanel",
+    "Review",
+    "Measurement",
+    "ClaimJudgement",
+    "CalibrationBucket",
+    "AdjudicationError",
+    "REQUIRED_HUMAN_REVIEWERS",
     "FACTUAL_SUPPORT",
     "GATE_TARGETS",
     "SCHEMA_VERSION",

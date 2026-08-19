@@ -18,12 +18,21 @@ import pytest
 
 from ecu_recovery.evaluation.agent import (
     GATE_TARGETS,
+    REQUIRED_HUMAN_REVIEWERS,
+    AdjudicationError,
     AgentMetrics,
+    ClaimJudgement,
     Provenance,
+    Review,
+    ReviewPanel,
     Transcript,
     TranscriptError,
     check_gate,
+    classification_accuracy,
+    confidence_calibration,
+    critical_unsupported_claims,
     evaluate,
+    load_panel,
     load_transcripts,
     parse_transcript,
     render_report,
@@ -390,52 +399,6 @@ def test_an_incomplete_fixture_expectation_is_itself_a_failure() -> None:
     assert any("declares no expectation" in item for item in mismatches)
 
 
-def test_classification_accuracy_is_unmeasured_without_a_reviewer(tmp_path: Path) -> None:
-    run = evaluate(TRANSCRIPTS, adjudications_dir=tmp_path / "absent")
-
-    accuracy = run.metrics.classification_accuracy
-
-    assert accuracy.measured is False
-    assert accuracy.render() == "UNMEASURED"
-    assert "blinded" in accuracy.reason
-
-
-def test_confidence_calibration_is_unmeasured_without_semantic_labels(
-    tmp_path: Path,
-) -> None:
-    """Citations resolving is not correctness; 07 is the proof."""
-    run = evaluate(TRANSCRIPTS, adjudications_dir=tmp_path / "absent")
-
-    assert run.metrics.confidence_calibration.measured is False
-    # The citation-based buckets remain, under a name that says what they are.
-    assert run.metrics.citation_support_calibration
-
-
-def test_a_well_cited_wrong_claim_is_not_counted_as_supported() -> None:
-    """07 resolves every citation and is wrong. Only adjudication can say so."""
-    score = score_transcript(by_id("07-wrong-classification"))
-
-    assert score.valid_citations == score.citations == 1
-    assert score.unsupported_factual_claims == 0
-
-    run = evaluate(TRANSCRIPTS)
-
-    assert run.metrics.confidence_calibration.measured is True
-    assert run.metrics.classification_accuracy.ratio is not None
-    assert run.metrics.classification_accuracy.ratio.numerator < (
-        run.metrics.classification_accuracy.ratio.denominator
-    )
-
-
-def test_critical_unsupported_claims_is_unmeasured_without_adjudication(
-    tmp_path: Path,
-) -> None:
-    """A zero nobody assessed would be the most dangerous line in the file."""
-    run = evaluate(TRANSCRIPTS, adjudications_dir=tmp_path / "absent")
-
-    assert run.metrics.critical_unsupported_claims.measured is False
-
-
 def test_an_unmeasured_metric_can_never_satisfy_the_gate() -> None:
     metrics = clean_metrics(
         critical=Measurement.unmeasured("critical_unsupported_claims", "no reviewer")
@@ -447,19 +410,331 @@ def test_an_unmeasured_metric_can_never_satisfy_the_gate() -> None:
     assert checks["critical_unsupported_claims"].render_observed() == "UNMEASURED"
 
 
-def test_adjudication_never_modifies_the_frozen_transcript() -> None:
-    """Judgement arrives beside the transcript, never inside it."""
-    transcript = by_id("07-wrong-classification")
-
-    assert "adjudication" not in transcript.investigation
-    assert "semantically_supported" not in json.dumps(transcript.investigation)
-    assert (TRANSCRIPTS.parent / "adjudications" / "07-wrong-classification.json").is_file()
+# --- adjudication: reviewers, quorum, and reconciliation ---
 
 
-def test_authored_adjudication_keeps_the_run_baseline_only() -> None:
-    """A label written to test the scorer is not a reviewer's verdict."""
+def panel_of(*reviews: Review) -> ReviewPanel:
+    return ReviewPanel(reviews=tuple(reviews))
+
+
+def human(
+    transcript_id: str,
+    reviewer: str,
+    *,
+    classification: bool | None = None,
+    supported: bool | None = None,
+    critical: bool | None = None,
+) -> Review:
+    return Review(
+        transcript_id=transcript_id,
+        reviewer=reviewer,
+        kind="human",
+        classification_correct=classification,
+        judgements=(
+            ClaimJudgement(claim_index=0, semantically_supported=supported, critical=critical),
+        ),
+    )
+
+
+def one_claim(transcript_id: str = "t", confidence: float = 0.5) -> Transcript:
+    return Transcript(
+        id=transcript_id,
+        sample_id="multi_function_pipeline_v1",
+        subject="0x00001000",
+        scenario="synthetic",
+        investigation={
+            "claims": [
+                {"statement": "s", "support": "observed", "confidence": confidence, "citations": []}
+            ],
+            "citation_checks": [],
+            "demotions": [],
+            "failure": None,
+        },
+    )
+
+
+# --- 1. critical AND unsupported ---
+
+
+@pytest.mark.parametrize(
+    "supported,critical,expected",
+    [
+        (True, True, 0),  # critical but true: not a failure
+        (False, False, 0),  # unsupported but nobody would act on it
+        (False, True, 1),  # the case the metric names
+        (True, False, 0),
+    ],
+)
+def test_critical_unsupported_truth_table(supported: bool, critical: bool, expected: int) -> None:
+    """The metric is the conjunction. Either half alone is a different number."""
+    transcripts = (one_claim(),)
+    panel = panel_of(
+        human("t", "reviewer-a", supported=supported, critical=critical),
+        human("t", "reviewer-b", supported=supported, critical=critical),
+    )
+
+    measurement = critical_unsupported_claims(transcripts, panel)
+
+    assert measurement.measured is True
+    assert measurement.count == expected
+
+
+@pytest.mark.parametrize("field", ["supported", "critical"])
+def test_a_half_judged_claim_leaves_the_count_unmeasured(field: str) -> None:
+    """A lower bound is not a count, and must not be published as one."""
+    kwargs: dict[str, object] = {"supported": False, "critical": True}
+    kwargs[field] = None
+    transcripts = (one_claim(),)
+    panel = panel_of(
+        human("t", "reviewer-a", **kwargs),  # type: ignore[arg-type]
+        human("t", "reviewer-b", **kwargs),  # type: ignore[arg-type]
+    )
+
+    measurement = critical_unsupported_claims(transcripts, panel)
+
+    assert measurement.measured is False
+    assert measurement.count is None
+
+
+def test_no_adjudication_at_all_is_unmeasured_not_zero() -> None:
+    measurement = critical_unsupported_claims((one_claim(),), ReviewPanel())
+
+    assert measurement.measured is False
+    assert "two blinded reviewers" in measurement.reason
+
+
+# --- 2. calibration is not accuracy ---
+
+
+def _corpus(pairs: list[tuple[float, bool]]) -> tuple[tuple[Transcript, ...], ReviewPanel]:
+    transcripts = tuple(one_claim(f"t{i}", confidence) for i, (confidence, _) in enumerate(pairs))
+    reviews = []
+    for index, (_, correct) in enumerate(pairs):
+        for reviewer in ("reviewer-a", "reviewer-b"):
+            reviews.append(human(f"t{index}", reviewer, supported=correct, critical=False))
+    return transcripts, panel_of(*reviews)
+
+
+def test_calibration_distinguishes_corpora_with_identical_accuracy() -> None:
+    """The adversarial case: same accuracy, opposite calibration.
+
+    Confident-when-right is well calibrated. Confident-when-wrong is not. Both
+    are right half the time, so an accuracy rate cannot tell them apart — which
+    is exactly why publishing one under the name calibration hid the difference.
+    """
+    calibrated, calibrated_panel = _corpus([(0.9, True), (0.1, False)])
+    miscalibrated, miscalibrated_panel = _corpus([(0.1, True), (0.9, False)])
+
+    good = confidence_calibration(calibrated, calibrated_panel)
+    bad = confidence_calibration(miscalibrated, miscalibrated_panel)
+
+    # Identical semantic accuracy.
+    assert sum(1 for _, correct in [(0.9, True), (0.1, False)] if correct) == 1
+    assert sum(1 for _, correct in [(0.1, True), (0.9, False)] if correct) == 1
+
+    assert good.value is not None and bad.value is not None
+    assert good.value < bad.value
+    assert good.value == pytest.approx(0.1, abs=1e-6)
+    assert bad.value == pytest.approx(0.9, abs=1e-6)
+
+
+def test_perfect_calibration_scores_zero() -> None:
+    perfect, panel = _corpus([(1.0, True), (0.0, False)])
+
+    assert confidence_calibration(perfect, panel).value == pytest.approx(0.0, abs=1e-6)
+
+
+def test_calibration_is_unmeasured_without_semantic_labels() -> None:
+    assert confidence_calibration((one_claim(),), ReviewPanel()).measured is False
+
+
+def test_citation_support_calibration_is_kept_but_separate() -> None:
+    """Citations resolving is a diagnostic, not correctness. 07 is the proof."""
+    run = evaluate(TRANSCRIPTS)
+
+    assert run.metrics.citation_support_calibration
+    assert run.metrics.confidence_calibration.name == "confidence_calibration"
+
+
+# --- 3. two blinded reviewers ---
+
+
+def test_two_distinct_human_reviewers_are_required_for_quorum() -> None:
+    single = panel_of(human("t", "reviewer-a", supported=True, critical=False))
+    pair = panel_of(
+        human("t", "reviewer-a", supported=True, critical=False),
+        human("t", "reviewer-b", supported=True, critical=False),
+    )
+
+    assert single.has_quorum("t") is False
+    assert pair.has_quorum("t") is True
+    assert REQUIRED_HUMAN_REVIEWERS == 2
+
+
+def test_one_reviewer_filing_twice_does_not_make_a_quorum(tmp_path: Path) -> None:
+    for name in ("a", "b"):
+        (tmp_path / f"t.{name}.json").write_text(
+            json.dumps(
+                {
+                    "transcript_id": "t",
+                    "reviewer": "reviewer-a",
+                    "kind": "human",
+                    "classification_correct": True,
+                    "judgements": [],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+    with pytest.raises(AdjudicationError, match="twice"):
+        load_panel(tmp_path)
+
+
+def test_authored_labels_never_satisfy_quorum() -> None:
+    authored = panel_of(
+        Review("t", "authored-a", kind="authored", classification_correct=True),
+        Review("t", "authored-b", kind="authored", classification_correct=True),
+    )
+
+    assert authored.has_quorum("t") is False
+    assert authored.fully_human is False
+
+
+def test_a_single_human_reviewer_is_not_enough_for_a_gate_eligible_metric() -> None:
+    transcripts = (one_claim(),)
+    panel = panel_of(human("t", "reviewer-a", classification=True, supported=True, critical=False))
+
+    measurement = classification_accuracy(transcripts, panel)
+
+    assert measurement.measured is True  # a number exists
+    assert measurement.gate_eligible is False  # but it cannot pass a gate
+    assert "two distinct human reviewers" in measurement.reason
+
+
+def test_two_human_reviewers_in_agreement_are_gate_eligible() -> None:
+    transcripts = (one_claim(),)
+    panel = panel_of(
+        human("t", "reviewer-a", classification=True, supported=True, critical=False),
+        human("t", "reviewer-b", classification=True, supported=True, critical=False),
+    )
+
+    measurement = classification_accuracy(transcripts, panel)
+
+    assert measurement.gate_eligible is True
+    assert measurement.ratio == Ratio(1, 1)
+
+
+def test_reviewer_disagreement_is_recorded_and_left_unresolved() -> None:
+    """Never silently pick a side; a contested judgement is not a measurement."""
+    transcripts = (one_claim(),)
+    panel = panel_of(
+        human("t", "reviewer-a", classification=True, supported=True, critical=False),
+        human("t", "reviewer-b", classification=False, supported=False, critical=False),
+    )
+
+    assert panel.classification("t").disagreed is True
+    assert panel.classification("t").value is None
+    assert panel.claim_support("t", 0).disagreed is True
+    assert panel.disagreements("t", 1)
+
+    # ...and a disagreed subject is not counted as either right or wrong.
+    assert classification_accuracy(transcripts, panel).measured is False
+
+
+def test_the_committed_corpus_records_its_disagreement() -> None:
+    run = evaluate(TRANSCRIPTS)
+
+    assert any("03-mixed-citations" in item for item in run.metrics.review_disagreements)
+
+
+def test_authored_reviews_keep_the_run_baseline_only() -> None:
     run = evaluate(TRANSCRIPTS)
 
     assert run.adjudicators == ("authored",)
     assert run.baseline_only is True
     assert run.as_dict()["sufficient_for_gate_agent_mvp"] is False
+
+
+def test_reviews_live_beside_the_transcript_never_inside_it() -> None:
+    transcript = by_id("07-wrong-classification")
+
+    assert "semantically_supported" not in json.dumps(transcript.investigation)
+    assert (
+        TRANSCRIPTS.parent / "adjudications" / "07-wrong-classification.authored-a.json"
+    ).is_file()
+    assert (
+        TRANSCRIPTS.parent / "adjudications" / "07-wrong-classification.authored-b.json"
+    ).is_file()
+
+
+# --- 4. classification is per subject, not per claim ---
+
+
+def test_classification_is_one_verdict_per_subject_however_many_claims() -> None:
+    """A five-claim function must not outvote a one-claim function."""
+    chatty = Transcript(
+        id="chatty",
+        sample_id="multi_function_pipeline_v1",
+        subject="0x00001000",
+        scenario="five claims about one function",
+        investigation={
+            "claims": [
+                {"statement": f"s{i}", "support": "observed", "confidence": 0.5, "citations": []}
+                for i in range(5)
+            ],
+            "citation_checks": [],
+            "demotions": [],
+            "failure": None,
+        },
+    )
+    terse = one_claim("terse")
+    panel = panel_of(
+        human("chatty", "reviewer-a", classification=False),
+        human("chatty", "reviewer-b", classification=False),
+        human("terse", "reviewer-a", classification=True),
+        human("terse", "reviewer-b", classification=True),
+    )
+
+    measurement = classification_accuracy((chatty, terse), panel)
+
+    # Two subjects, two votes — not six.
+    assert measurement.ratio == Ratio(1, 2)
+
+
+def test_an_unknown_claim_does_not_become_a_classification_failure() -> None:
+    """Only an explicit reviewer verdict counts; silence is not a wrong answer."""
+    unknown_only = Transcript(
+        id="u",
+        sample_id="multi_function_pipeline_v1",
+        subject="0x00001000",
+        scenario="agent declined",
+        investigation={
+            "claims": [
+                {
+                    "statement": "cannot tell",
+                    "support": "unknown",
+                    "confidence": 0.0,
+                    "citations": [],
+                }
+            ],
+            "citation_checks": [],
+            "demotions": [],
+            "failure": None,
+        },
+    )
+    panel = panel_of(
+        human("u", "reviewer-a", supported=True, critical=False),
+        human("u", "reviewer-b", supported=True, critical=False),
+    )
+
+    measurement = classification_accuracy((unknown_only,), panel)
+
+    assert measurement.measured is False
+    assert measurement.ratio is None
+
+
+def test_the_lexical_diagnostic_stays_separate_and_ungated() -> None:
+    run = evaluate(TRANSCRIPTS)
+
+    assert run.metrics.classification_term_recall_diagnostic.denominator > 0
+    assert not [metric for metric, _, _ in GATE_TARGETS if "term_recall" in metric]

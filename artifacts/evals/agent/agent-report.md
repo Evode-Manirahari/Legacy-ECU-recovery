@@ -47,23 +47,24 @@ expected to fail; they are not a verdict on an agent.
 | schema_compliance | == 100% | 87.5% (7/8) | FAIL |
 | unsupported_factual_claims | <= 5% | 37.5% (3/8) | FAIL |
 | tool_hallucinations | == 0 | 2 | FAIL |
-| critical_unsupported_claims | == 0 | 2 | FAIL |
+| critical_unsupported_claims | == 0% | UNMEASURED | FAIL |
 
 Four of these are gated at a perfect score because they measure the
 checking, not the reasoning. A fabricated citation reaching a surviving
 claim is a failure of the mechanism, and there is no acceptable rate for it.
 
-## Not measured
+## Adjudicated metrics
 
-These need semantic adjudication. None is reported as a number until a
-reviewer supplies one, because a metric nobody computed must not read like
-a metric that came out well.
+These need semantic judgement. `EVALS.md` requires two blinded reviewers,
+so only a reconciled two-human verdict is gate-eligible; authored labels
+compute a number to verify the scorer and nothing more. A metric nobody
+qualified has judged reports UNMEASURED rather than a flattering zero.
 
-| Metric | State | Why |
-|---|---|---|
-| classification_accuracy | 42.8571% (3/7) |  |
-| confidence_calibration | 57.1429% (4/7) | calibration against adjudicated semantic support |
-| critical_unsupported_claims | 2 |  |
+| Metric | Value | Provenance | Note |
+|---|---|---|---|
+| classification_accuracy | 40.0% (2/5) | authored | fewer than two distinct human reviewers; authored labels verify the scorer and never satisfy review quorum |
+| confidence_calibration (ECE) | 0.2857 | authored | fewer than two distinct human reviewers; authored labels verify the scorer and never satisfy review quorum |
+| critical_unsupported_claims | UNMEASURED | none | 1 claim(s) carry only one of support and criticality, so the count would be a lower bound rather than a count |
 
 ## Diagnostics — not the metrics above
 
@@ -84,6 +85,27 @@ on purpose. Real confidence calibration stays unmeasured above.
 | 0.00–0.25 | 1 | 1 | 100.0% (1/1) | -0.875 |
 | 0.50–0.75 | 1 | 1 | 100.0% (1/1) | -0.375 |
 | 0.75–1.00 | 3 | 3 | 100.0% (3/3) | -0.125 |
+
+## Confidence calibration (ECE)
+
+Expected calibration error: the size-weighted mean gap between stated
+confidence and adjudicated correctness. Zero is perfect. This is not an
+accuracy rate — two runs can be right equally often and differ entirely
+here.
+
+| Confidence | Claims | Correct | Mean stated | Accuracy | Gap |
+|---|---:|---:|---:|---:|---:|
+| 0.00–0.25 | 3 | 1 | 0.017 | 0.333 | -0.317 |
+| 0.50–0.75 | 1 | 1 | 0.700 | 1.000 | -0.300 |
+| 0.75–1.00 | 3 | 2 | 0.917 | 0.667 | +0.250 |
+
+## Reviewer disagreements — left unresolved on purpose
+
+Where reviewers differ the label is not settled by picking one or by
+averaging. The claim stays unjudged and the disagreement is recorded.
+
+- 03-mixed-citations: reviewers disagree on classification
+- 03-mixed-citations: reviewers disagree on claim 0 support
 
 ## Per transcript
 

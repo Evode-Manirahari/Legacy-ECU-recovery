@@ -1,18 +1,18 @@
 {
-  "adjudicator": "authored",
+  "classification_correct": true,
   "judgements": [
     {
       "claim_index": 0,
-      "classification_correct": true,
       "critical": false,
       "semantically_supported": true
     },
     {
       "claim_index": 1,
-      "classification_correct": false,
       "critical": false,
       "semantically_supported": false
     }
   ],
+  "kind": "authored",
+  "reviewer": "authored-a",
   "transcript_id": "08-confidence-extremes"
 }

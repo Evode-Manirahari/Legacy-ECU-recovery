@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .adjudication import load_adjudications
+from .adjudication import load_panel
 from .gate import check_gate
 from .models import AgentEvaluationRun, Provenance, TranscriptScore
 from .scoring import aggregate, expected_roles, score_transcript, verify_detection
@@ -27,7 +27,7 @@ def evaluate(
     transcripts = load_transcripts(directory)
     if adjudications_dir is None:
         adjudications_dir = directory.parent / "adjudications"
-    adjudications = load_adjudications(adjudications_dir)
+    panel = load_panel(adjudications_dir)
     roles_by_sample: dict[str, dict[str, str]] = {}
     scores: list[TranscriptScore] = []
     for transcript in transcripts:
@@ -45,7 +45,7 @@ def evaluate(
         for transcript, score in zip(transcripts, scores, strict=True)
         for mismatch in verify_detection(transcript, score)
     )
-    metrics = aggregate(transcripts, tuple(scores), adjudications)
+    metrics = aggregate(transcripts, tuple(scores), panel)
     kinds = {transcript.provenance for transcript in transcripts}
     real_model = kinds == {"model"}
     return AgentEvaluationRun(
@@ -62,5 +62,5 @@ def evaluate(
         gate=check_gate(metrics),
         detection_mismatches=detection_mismatches,
         adversarial=any(transcript.expects for transcript in transcripts),
-        adjudicators=tuple(sorted({item.adjudicator for item in adjudications.values()})),
+        adjudicators=panel.kinds,
     )

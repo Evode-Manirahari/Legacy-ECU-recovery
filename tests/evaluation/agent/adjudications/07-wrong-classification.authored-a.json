@@ -1,12 +1,13 @@
 {
-  "adjudicator": "authored",
+  "classification_correct": false,
   "judgements": [
     {
       "claim_index": 0,
-      "classification_correct": false,
       "critical": true,
       "semantically_supported": false
     }
   ],
+  "kind": "authored",
+  "reviewer": "authored-a",
   "transcript_id": "07-wrong-classification"
 }

@@ -40,27 +40,41 @@ class Measurement:
     name: str
     ratio: Ratio | None = None
     count: int | None = None
+    value: float | None = None
     measured: bool = True
     reason: str = ""
+    #: How the judgement behind this number was obtained. Only a reconciled
+    #: two-reviewer verdict may satisfy a gate; an authored label can compute a
+    #: number for testing the scorer and nothing more.
+    provenance: str = "derived"
 
     @classmethod
     def unmeasured(cls, name: str, reason: str) -> Measurement:
-        return cls(name=name, measured=False, reason=reason)
+        return cls(name=name, measured=False, reason=reason, provenance="none")
+
+    @property
+    def gate_eligible(self) -> bool:
+        return self.measured and self.provenance in ("derived", "human-quorum")
 
     def render(self) -> str:
         if not self.measured:
             return "UNMEASURED"
         if self.count is not None:
             return str(self.count)
+        if self.value is not None:
+            return f"{self.value:.4f}"
         return "n/a" if self.ratio is None else self.ratio.render()
 
     def as_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "measured": self.measured,
+            "provenance": self.provenance,
+            "gate_eligible": self.gate_eligible,
             "reason": self.reason,
             "ratio": None if self.ratio is None else self.ratio.as_dict(),
             "count": self.count,
+            "value": self.value,
         }
 
 
@@ -163,6 +177,42 @@ class ConfidenceBucket:
 
 
 @dataclass(frozen=True)
+class CalibrationBucket:
+    """One confidence band, with the gap that calibration is actually about.
+
+    Accuracy answers "how often is it right". Calibration answers "when it says
+    0.9, is it right about nine times in ten". Two runs can share the first and
+    differ completely in the second, which is why an accuracy rate must never be
+    published under this name.
+    """
+
+    lower: float
+    upper: float
+    claims: int
+    correct: int
+    mean_confidence: float
+
+    @property
+    def accuracy(self) -> float:
+        return self.correct / self.claims if self.claims else 0.0
+
+    @property
+    def gap(self) -> float:
+        """Signed. Positive means the band was overconfident."""
+        return round(self.mean_confidence - self.accuracy, 6)
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "range": [self.lower, self.upper],
+            "claims": self.claims,
+            "correct": self.correct,
+            "mean_confidence": round(self.mean_confidence, 6),
+            "accuracy": round(self.accuracy, 6),
+            "gap": self.gap,
+        }
+
+
+@dataclass(frozen=True)
 class TranscriptScore:
     """One frozen transcript, scored."""
 
@@ -231,6 +281,8 @@ class AgentMetrics:
     confidence_calibration: Measurement
     classification_term_recall_diagnostic: Ratio
     citation_support_calibration: tuple[ConfidenceBucket, ...] = ()
+    calibration_buckets: tuple[CalibrationBucket, ...] = ()
+    review_disagreements: tuple[str, ...] = ()
     transcripts: int = 0
     demotions: int = 0
 
@@ -251,6 +303,8 @@ class AgentMetrics:
             "citation_support_calibration": [
                 item.as_dict() for item in self.citation_support_calibration
             ],
+            "calibration_buckets": [item.as_dict() for item in self.calibration_buckets],
+            "review_disagreements": list(self.review_disagreements),
         }
 
 

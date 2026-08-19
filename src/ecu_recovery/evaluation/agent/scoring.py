@@ -23,10 +23,11 @@ from typing import Any
 
 from ..groundtruth import DEFAULT_SAMPLES_ROOT
 from ..models import Ratio
-from .adjudication import Adjudication
+from .adjudication import ReviewPanel
 from .models import (
     FACTUAL_SUPPORT,
     AgentMetrics,
+    CalibrationBucket,
     ClassificationScore,
     ConfidenceBucket,
     DetectorVector,
@@ -191,109 +192,169 @@ def confidence_buckets(transcripts: tuple[Transcript, ...]) -> tuple[ConfidenceB
     return tuple(buckets)
 
 
-_NO_ADJUDICATION = (
+_NO_REVIEW = (
     "semantic adjudication is required and none has been supplied; EVALS.md "
-    "reserves this judgement for blinded human reviewers"
+    "reserves this judgement for two blinded reviewers"
+)
+_NO_QUORUM = (
+    "fewer than two distinct human reviewers; authored labels verify the scorer "
+    "and never satisfy review quorum"
 )
 
 
-def _adjudicated(
-    transcripts: tuple[Transcript, ...],
-    adjudications: dict[str, Adjudication],
-    field: str,
-) -> tuple[int, int]:
-    """Count (true, judged) for one adjudicated boolean across every claim."""
-    judged = 0
-    positive = 0
-    for transcript in transcripts:
-        adjudication = adjudications.get(transcript.id)
-        if adjudication is None:
-            continue
-        for index in range(len(transcript.claims)):
-            judgement = adjudication.for_claim(index)
-            if judgement is None:
-                continue
-            value = getattr(judgement, field)
-            if value is None:
-                continue
-            judged += 1
-            positive += 1 if value else 0
-    return positive, judged
+def _provenance(panel: ReviewPanel, transcript_ids: list[str]) -> str:
+    if panel.fully_human and all(panel.has_quorum(item) for item in transcript_ids):
+        return "human-quorum"
+    return "authored"
 
 
-def classification_accuracy(
-    transcripts: tuple[Transcript, ...], adjudications: dict[str, Adjudication]
+def critical_unsupported_claims(
+    transcripts: tuple[Transcript, ...], panel: ReviewPanel
 ) -> Measurement:
-    correct, judged = _adjudicated(transcripts, adjudications, "classification_correct")
-    if judged == 0:
-        return Measurement.unmeasured("classification_accuracy", _NO_ADJUDICATION)
-    return Measurement("classification_accuracy", ratio=Ratio(correct, judged))
+    """Claims that are **both** critical and semantically unsupported.
 
+    Both halves matter. A critical claim that is true is not a failure, and an
+    unsupported claim nobody would act on is a different and lesser problem.
+    Counting either alone would report a number under a name that means
+    something else.
 
-def confidence_calibration(
-    transcripts: tuple[Transcript, ...], adjudications: dict[str, Adjudication]
-) -> Measurement:
-    """Calibration against *semantic* correctness, not against citation resolution.
-
-    Citations resolving says the agent quoted a real tool result. It does not
-    say the claim built on it is true, which `07-wrong-classification` exists to
-    demonstrate: every citation holds and the claim is wrong. So this stays
-    unmeasured until semantic labels exist, and the citation-based buckets are
-    published beside it under a name that says what they are.
+    A claim missing either verdict leaves the count a lower bound rather than a
+    count, so the measurement reports itself incomplete instead of quietly
+    settling for what it happens to know.
     """
-    _, judged = _adjudicated(transcripts, adjudications, "semantically_supported")
+    counted = 0
+    fully_judged = 0
+    partial = 0
+    for transcript in transcripts:
+        for index in range(len(transcript.claims)):
+            support = panel.claim_support(transcript.id, index)
+            criticality = panel.claim_criticality(transcript.id, index)
+            if support.settled and criticality.settled:
+                fully_judged += 1
+                if criticality.value and not support.value:
+                    counted += 1
+            elif support.settled or criticality.settled:
+                partial += 1
+    if fully_judged == 0:
+        return Measurement.unmeasured("critical_unsupported_claims", _NO_REVIEW)
+    if partial:
+        return Measurement.unmeasured(
+            "critical_unsupported_claims",
+            f"{partial} claim(s) carry only one of support and criticality, so the "
+            "count would be a lower bound rather than a count",
+        )
+    ids = [item.id for item in transcripts]
+    provenance = _provenance(panel, ids)
+    return Measurement(
+        "critical_unsupported_claims",
+        count=counted,
+        provenance=provenance,
+        reason="" if provenance == "human-quorum" else _NO_QUORUM,
+    )
+
+
+def classification_accuracy(transcripts: tuple[Transcript, ...], panel: ReviewPanel) -> Measurement:
+    """One verdict per subject, not one per claim.
+
+    A function that provoked five claims must not outvote one that provoked a
+    single claim; the question is whether the function was identified, and there
+    is exactly one answer to it per function.
+    """
+    correct = 0
+    judged = 0
+    for transcript in transcripts:
+        verdict = panel.classification(transcript.id)
+        if not verdict.settled:
+            continue
+        judged += 1
+        correct += 1 if verdict.value else 0
     if judged == 0:
-        return Measurement.unmeasured("confidence_calibration", _NO_ADJUDICATION)
-    correct_by_bucket: list[ConfidenceBucket] = []
+        return Measurement.unmeasured("classification_accuracy", _NO_REVIEW)
+    ids = [item.id for item in transcripts]
+    provenance = _provenance(panel, ids)
+    return Measurement(
+        "classification_accuracy",
+        ratio=Ratio(correct, judged),
+        provenance=provenance,
+        reason="" if provenance == "human-quorum" else _NO_QUORUM,
+    )
+
+
+def calibration_buckets(
+    transcripts: tuple[Transcript, ...], panel: ReviewPanel
+) -> tuple[CalibrationBucket, ...]:
+    """Stated confidence against adjudicated correctness, per band."""
+    buckets: list[CalibrationBucket] = []
     for lower, upper in _BUCKETS:
-        claims = 0
-        supported = 0
+        confidences: list[float] = []
+        correct = 0
         for transcript in transcripts:
-            adjudication = adjudications.get(transcript.id)
-            if adjudication is None:
-                continue
             for index, claim in enumerate(transcript.claims):
-                judgement = adjudication.for_claim(index)
-                if judgement is None or judgement.semantically_supported is None:
+                verdict = panel.claim_support(transcript.id, index)
+                if not verdict.settled:
                     continue
                 confidence = float(claim.get("confidence", 0.0))
                 inside = lower <= confidence < upper or (upper == 1.0 and confidence == 1.0)
                 if not inside:
                     continue
-                claims += 1
-                supported += 1 if judgement.semantically_supported else 0
-        if claims:
-            correct_by_bucket.append(ConfidenceBucket(lower, upper, claims, supported))
-    total_claims = sum(item.claims for item in correct_by_bucket)
-    total_supported = sum(item.supported for item in correct_by_bucket)
+                confidences.append(confidence)
+                correct += 1 if verdict.value else 0
+        if confidences:
+            buckets.append(
+                CalibrationBucket(
+                    lower=lower,
+                    upper=upper,
+                    claims=len(confidences),
+                    correct=correct,
+                    mean_confidence=sum(confidences) / len(confidences),
+                )
+            )
+    return tuple(buckets)
+
+
+def confidence_calibration(transcripts: tuple[Transcript, ...], panel: ReviewPanel) -> Measurement:
+    """Expected calibration error: the weighted mean gap between stated and observed.
+
+        ECE = sum over bands of  (band size / total) * |mean confidence - accuracy|
+
+    Accuracy is not calibration. Two corpora can be right equally often and be
+    utterly different here: one that says 0.9 when it is right and 0.1 when it is
+    wrong is well calibrated, and one that says the reverse is not, though both
+    score fifty percent. Publishing a correctness rate under this name would
+    hide exactly that difference.
+
+    Zero is perfect. Requires adjudicated semantic correctness.
+    """
+    buckets = calibration_buckets(transcripts, panel)
+    if not buckets:
+        return Measurement.unmeasured("confidence_calibration", _NO_REVIEW)
+    total_claims = sum(item.claims for item in buckets)
+    ece = sum(item.claims * abs(item.gap) for item in buckets) / total_claims
+    ids = [item.id for item in transcripts]
+    provenance = _provenance(panel, ids)
     return Measurement(
         "confidence_calibration",
-        ratio=Ratio(total_supported, total_claims),
-        reason="calibration against adjudicated semantic support",
+        value=round(ece, 6),
+        provenance=provenance,
+        reason=(
+            "expected calibration error over adjudicated semantic correctness; 0 is perfect"
+            if provenance == "human-quorum"
+            else _NO_QUORUM
+        ),
     )
-
-
-def critical_unsupported_claims(
-    transcripts: tuple[Transcript, ...], adjudications: dict[str, Adjudication]
-) -> Measurement:
-    """Criticality is a judgement, so an unjudged corpus reports unmeasured.
-
-    Reporting zero here without adjudication would be the most dangerous number
-    in the file: a gate line reading "0 critical unsupported claims" that nobody
-    ever assessed.
-    """
-    critical, judged = _adjudicated(transcripts, adjudications, "critical")
-    if judged == 0:
-        return Measurement.unmeasured("critical_unsupported_claims", _NO_ADJUDICATION)
-    return Measurement("critical_unsupported_claims", count=critical)
 
 
 def aggregate(
     transcripts: tuple[Transcript, ...],
     scores: tuple[TranscriptScore, ...],
-    adjudications: dict[str, Adjudication] | None = None,
+    panel: ReviewPanel | None = None,
 ) -> AgentMetrics:
-    adjudications = adjudications or {}
+    panel = panel or ReviewPanel()
+    disagreements = tuple(
+        item
+        for transcript in transcripts
+        for item in panel.disagreements(transcript.id, len(transcript.claims))
+    )
     return AgentMetrics(
         evidence_reference_validity=Ratio(
             sum(item.valid_citations for item in scores),
@@ -305,13 +366,15 @@ def aggregate(
             sum(item.raw_factual_claims for item in scores),
         ),
         tool_hallucinations=sum(item.fabricated_citations for item in scores),
-        critical_unsupported_claims=critical_unsupported_claims(transcripts, adjudications),
-        classification_accuracy=classification_accuracy(transcripts, adjudications),
-        confidence_calibration=confidence_calibration(transcripts, adjudications),
+        critical_unsupported_claims=critical_unsupported_claims(transcripts, panel),
+        classification_accuracy=classification_accuracy(transcripts, panel),
+        confidence_calibration=confidence_calibration(transcripts, panel),
         classification_term_recall_diagnostic=pooled(
             [item.classification.recall for item in scores if item.classification is not None]
         ),
         citation_support_calibration=confidence_buckets(transcripts),
+        calibration_buckets=calibration_buckets(transcripts, panel),
+        review_disagreements=disagreements,
         transcripts=len(scores),
         demotions=sum(item.demotions for item in scores),
     )

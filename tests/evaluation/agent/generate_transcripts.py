@@ -131,65 +131,101 @@ EXPECTS: dict[str, dict[str, object]] = {
     },
 }
 
-#: Authored post-freeze judgements. These exist only to prove the evaluator
-#: computes adjudicated metrics correctly. They are labelled `authored`, which
-#: keeps the whole run baseline-only: a label written to test the scorer is not
-#: a reviewer's verdict, and treating it as one would be grading our own work.
+#: Authored reviews. Two reviewers per transcript, because the metrics they feed
+#: require two, and a fixture set that could not express a second opinion would
+#: make the quorum rule untestable.
 #:
-#: 07 is the interesting one. Every citation resolves and the claim is wrong, so
-#: it is semantically unsupported, classified incorrectly, and critical - the
-#: exact case that proves citation resolution is not semantic correctness.
-ADJUDICATIONS: dict[str, list[dict[str, object]]] = {
+#: They are labelled `authored`, which is what keeps them out of the gate: a
+#: label written to check the scorer is not a reviewer's verdict, however many
+#: of them there are. 03 carries a deliberate disagreement so the reconciliation
+#: policy has something to refuse to resolve.
+#:
+#: `classification_correct` is one verdict per review for the whole subject.
+#: 08 provokes two claims and still gets one classification vote, which is the
+#: point: the question is whether the function was identified.
+REVIEWS: dict[str, list[dict[str, object]]] = {
     "01-supported": [
         {
-            "claim_index": 0,
-            "semantically_supported": True,
+            "reviewer": "authored-a",
             "classification_correct": True,
-            "critical": False,
+            "judgements": [
+                {"claim_index": 0, "semantically_supported": True, "critical": False},
+                {"claim_index": 1, "semantically_supported": True, "critical": False},
+            ],
         },
         {
-            "claim_index": 1,
-            "semantically_supported": True,
+            "reviewer": "authored-b",
             "classification_correct": True,
-            "critical": False,
+            "judgements": [
+                {"claim_index": 0, "semantically_supported": True, "critical": False},
+                {"claim_index": 1, "semantically_supported": True, "critical": False},
+            ],
+        },
+    ],
+    "03-mixed-citations": [
+        {
+            "reviewer": "authored-a",
+            "classification_correct": False,
+            "judgements": [{"claim_index": 0, "semantically_supported": False, "critical": True}],
+        },
+        {
+            "reviewer": "authored-b",
+            "classification_correct": True,
+            "judgements": [{"claim_index": 0, "semantically_supported": True, "critical": True}],
         },
     ],
     "04-unsupported-assertion": [
         {
-            "claim_index": 0,
-            "semantically_supported": False,
+            "reviewer": "authored-a",
             "classification_correct": False,
-            "critical": True,
+            "judgements": [{"claim_index": 0, "semantically_supported": False, "critical": True}],
+        },
+        {
+            "reviewer": "authored-b",
+            "classification_correct": False,
+            "judgements": [{"claim_index": 0, "semantically_supported": False, "critical": True}],
         },
     ],
     "05-honest-unknown": [
         {
-            "claim_index": 0,
-            "semantically_supported": True,
+            "reviewer": "authored-a",
             "classification_correct": False,
-            "critical": False,
+            "judgements": [{"claim_index": 0, "semantically_supported": True, "critical": False}],
+        },
+        {
+            "reviewer": "authored-b",
+            "classification_correct": False,
+            "judgements": [{"claim_index": 0, "semantically_supported": True, "critical": False}],
         },
     ],
     "07-wrong-classification": [
         {
-            "claim_index": 0,
-            "semantically_supported": False,
+            "reviewer": "authored-a",
             "classification_correct": False,
-            "critical": True,
+            "judgements": [{"claim_index": 0, "semantically_supported": False, "critical": True}],
+        },
+        {
+            "reviewer": "authored-b",
+            "classification_correct": False,
+            "judgements": [{"claim_index": 0, "semantically_supported": False, "critical": True}],
         },
     ],
     "08-confidence-extremes": [
         {
-            "claim_index": 0,
-            "semantically_supported": True,
+            "reviewer": "authored-a",
             "classification_correct": True,
-            "critical": False,
+            "judgements": [
+                {"claim_index": 0, "semantically_supported": True, "critical": False},
+                {"claim_index": 1, "semantically_supported": False, "critical": False},
+            ],
         },
         {
-            "claim_index": 1,
-            "semantically_supported": False,
-            "classification_correct": False,
-            "critical": False,
+            "reviewer": "authored-b",
+            "classification_correct": True,
+            "judgements": [
+                {"claim_index": 0, "semantically_supported": True, "critical": False},
+                {"claim_index": 1, "semantically_supported": False, "critical": False},
+            ],
         },
     ],
 }
@@ -394,14 +430,15 @@ def main() -> int:
                 encoding="utf-8",
             )
             written += 1
-            judgements = ADJUDICATIONS.get(transcript_id)
-            if judgements is not None:
-                (ADJ / f"{transcript_id}.json").write_text(
+            for review in REVIEWS.get(transcript_id, []):
+                (ADJ / f"{transcript_id}.{review['reviewer']}.json").write_text(
                     json.dumps(
                         {
                             "transcript_id": transcript_id,
-                            "adjudicator": "authored",
-                            "judgements": judgements,
+                            "reviewer": review["reviewer"],
+                            "kind": "authored",
+                            "classification_correct": review["classification_correct"],
+                            "judgements": review["judgements"],
                         },
                         indent=2,
                         sort_keys=True,
@@ -410,7 +447,7 @@ def main() -> int:
                     encoding="utf-8",
                 )
     print(f"wrote {written} transcripts to {OUT}")
-    print(f"wrote {len(ADJUDICATIONS)} adjudications to {ADJ}")
+    print(f"wrote {sum(len(v) for v in REVIEWS.values())} reviews to {ADJ}")
     return 0
 
 

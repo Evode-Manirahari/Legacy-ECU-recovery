@@ -65,15 +65,50 @@
       "comparison": "==",
       "metric": "critical_unsupported_claims",
       "observed": null,
-      "observed_count": 2,
+      "observed_count": null,
       "passed": false,
       "threshold": 0.0,
-      "unmeasured": false,
-      "unmeasured_reason": ""
+      "unmeasured": true,
+      "unmeasured_reason": "1 claim(s) carry only one of support and criticality, so the count would be a lower bound rather than a count"
     }
   ],
   "gate_would_pass": false,
   "metrics": {
+    "calibration_buckets": [
+      {
+        "accuracy": 0.333333,
+        "claims": 3,
+        "correct": 1,
+        "gap": -0.316667,
+        "mean_confidence": 0.016667,
+        "range": [
+          0.0,
+          0.25
+        ]
+      },
+      {
+        "accuracy": 1.0,
+        "claims": 1,
+        "correct": 1,
+        "gap": -0.3,
+        "mean_confidence": 0.7,
+        "range": [
+          0.5,
+          0.75
+        ]
+      },
+      {
+        "accuracy": 0.666667,
+        "claims": 3,
+        "correct": 2,
+        "gap": 0.25,
+        "mean_confidence": 0.916667,
+        "range": [
+          0.75,
+          1.0
+        ]
+      }
+    ],
     "citation_support_calibration": [
       {
         "calibration_gap": -0.875,
@@ -126,15 +161,18 @@
     ],
     "classification_accuracy": {
       "count": null,
+      "gate_eligible": false,
       "measured": true,
       "name": "classification_accuracy",
+      "provenance": "authored",
       "ratio": {
-        "denominator": 7,
-        "numerator": 3,
-        "percent": 42.8571,
-        "rate": 0.42857142857142855
+        "denominator": 5,
+        "numerator": 2,
+        "percent": 40.0,
+        "rate": 0.4
       },
-      "reason": ""
+      "reason": "fewer than two distinct human reviewers; authored labels verify the scorer and never satisfy review quorum",
+      "value": null
     },
     "classification_term_recall_diagnostic": {
       "denominator": 56,
@@ -144,22 +182,23 @@
     },
     "confidence_calibration": {
       "count": null,
+      "gate_eligible": false,
       "measured": true,
       "name": "confidence_calibration",
-      "ratio": {
-        "denominator": 7,
-        "numerator": 4,
-        "percent": 57.1429,
-        "rate": 0.5714285714285714
-      },
-      "reason": "calibration against adjudicated semantic support"
+      "provenance": "authored",
+      "ratio": null,
+      "reason": "fewer than two distinct human reviewers; authored labels verify the scorer and never satisfy review quorum",
+      "value": 0.285714
     },
     "critical_unsupported_claims": {
-      "count": 2,
-      "measured": true,
+      "count": null,
+      "gate_eligible": false,
+      "measured": false,
       "name": "critical_unsupported_claims",
+      "provenance": "none",
       "ratio": null,
-      "reason": ""
+      "reason": "1 claim(s) carry only one of support and criticality, so the count would be a lower bound rather than a count",
+      "value": null
     },
     "demotions": 3,
     "evidence_reference_validity": {
@@ -168,6 +207,10 @@
       "percent": 77.7778,
       "rate": 0.7777777777777778
     },
+    "review_disagreements": [
+      "03-mixed-citations: reviewers disagree on classification",
+      "03-mixed-citations: reviewers disagree on claim 0 support"
+    ],
     "schema_compliance": {
       "denominator": 8,
       "numerator": 7,

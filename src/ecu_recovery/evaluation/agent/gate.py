@@ -37,9 +37,9 @@ class AgentGateCheck(GateCheck):
 
     @property
     def passed(self) -> bool:
-        # An unmeasured metric fails. It has not met the threshold; nobody has
-        # checked, and a gate that green-lights on absence of evidence is not a
-        # gate.
+        # An unmeasured or non-quorum metric fails. It has not met the
+        # threshold: nobody qualified has checked, and a gate that green-lights
+        # on absence of evidence is not a gate.
         if self.unmeasured:
             return False
         value = self.observed_value
@@ -85,7 +85,7 @@ def check_gate(metrics: AgentMetrics) -> tuple[AgentGateCheck, ...]:
                     comparison=comparison,
                     threshold=threshold,
                     observed_count=measurement.count,
-                    unmeasured=not measurement.measured,
+                    unmeasured=not measurement.gate_eligible,
                     unmeasured_reason=measurement.reason,
                 )
             )
