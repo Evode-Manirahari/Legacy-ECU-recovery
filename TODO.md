@@ -30,8 +30,8 @@ uv run ecu-recovery graph ready
 | `INTEGRATION-STATIC-001` | PASSED | verified after PR #20; end-to-end flow proven, three findings reported |
 | `REPORT-001` | PASSED | verified after PR #23; report distinguishes belief from testing |
 | `GATE-STATIC-MVP` | PASSED | all twelve static MVP properties verified 2026-08-18 |
-| `AGENT-001` | PENDING | **READY** — first node permitted a model |
-| `EVAL-AGENT-001` | PENDING | no agent measurement exists |
+| `AGENT-001` | PASSED | verified after PR #29; claims are checked against gathered facts |
+| `EVAL-AGENT-001` | PENDING | **READY** — no agent measurement exists |
 | `GATE-AGENT-MVP` | PENDING | blocks emulation and real firmware |
 
 Pre-graph code is *candidate implementation to verify and complete*, never
@@ -55,22 +55,21 @@ SPEC-001 → REPO-001 → GRAPH-001 ─┬─→ DATA-001 ─→ GHIDRA-001 ─�
 `artifacts/**`. Nothing else may create them. Each node's contract is in
 `prompts/<NODE-ID>.md`.
 
-## NOW — the investigator-agent phase is open
+## NOW — the agent exists and is unmeasured
 
-`AGENT-001` is `READY`. It is the first node permitted to use a model, and the
-division it must preserve is unchanged: tools derive facts, the model interprets
-them, experiments challenge interpretations, verification decides correctness.
+`EVAL-AGENT-001` is `READY`. `AGENT-001` interprets tool output into claims whose
+citations are checked by replay, but nothing yet says whether those claims are
+any good, and the node deliberately does not grade itself.
 
-It runs on the **synthetic corpus** through the **existing tool registry**, both
-deliberately. Introducing a model against the newly selected MPC5xx target at
-the same time would make every failure ambiguous — a wrong answer could be the
-model or the unfamiliar architecture, with no way to tell which. MPC5xx dataset
-work is a separate, later, measurable step.
+One decision is owed before that node starts: **what it scores**. The agent runs
+against test doubles today, and scoring doubles measures the doubles. The
+options are a real provider adapter, which is separately authorized work, or a
+recorded-transcript corpus replayed deterministically. A transcript corpus lets
+the measurement machinery be built and verified now, with the honest limit that
+verified scoring machinery is not the same as a baseline of a real model.
 
-Three nodes were authorized, not five. `HYPOTHESIS-001` is unnecessary because
-`EVIDENCE-001` already persists hypotheses with revisions and evidence links,
-and the agent-phase reporting node `MASTER_SPEC` once named cannot reuse the
-`REPORT-001` id, so it is deferred until it is actually needed.
+That ordering is the same argument as `GATE-STATIC-MVP`: make the measurement
+trustworthy before the thing being measured arrives.
 
 ## NEXT
 

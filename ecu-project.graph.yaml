@@ -368,7 +368,7 @@ nodes:
     # there would be no way to tell which. MPC5xx data work is its own step.
     depends_on:
       - GATE-STATIC-MVP
-    status: PENDING
+    status: PASSED
     worker: coding-agent
     prompt: prompts/AGENT-001.md
     allowed_paths:
@@ -379,7 +379,17 @@ nodes:
       commands:
         - uv run pytest
     retry_budget: 2
-    note: First node permitted a model. Tools derive facts; the model interprets them.
+    # Verified after PR #29. Facts are gathered through ToolRegistry before any
+    # model is involved and the model is handed those facts rather than tools,
+    # so retrieval stays deterministic and a wrong answer is attributable to
+    # interpretation. Citations are checked by replaying the recorded call and
+    # comparing a digest of the result, not its exit status; every citation on a
+    # factual claim must survive or the claim is demoted to unknown with the
+    # demotion recorded. No model-authored claim reaches Certainty.KNOWN, and
+    # evidence identity is content-derived so a shifted ordinal cannot make one
+    # observation impersonate another. Review found five defects across two
+    # rounds; all five are fixed and pinned by tests.
+    note: Verified after PR #29; a model interprets, and every claim it makes is checked.
 
   EVAL-AGENT-001:
     title: Deterministic agent evaluation
