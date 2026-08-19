@@ -32,7 +32,7 @@ uv run ecu-recovery graph ready
 | `GATE-STATIC-MVP` | PASSED | all twelve static MVP properties verified 2026-08-18 |
 | `AGENT-001` | PASSED | verified after PR #29; claims are checked against gathered facts |
 | `EVAL-AGENT-001` | PENDING | **READY** — no agent measurement exists |
-| `GATE-AGENT-MVP` | PENDING | blocks emulation and real firmware |
+| `GATE-AGENT-MVP` | PENDING | **READY** — blocked in substance: no genuine model transcript |
 
 Pre-graph code is *candidate implementation to verify and complete*, never
 already-completed graph work. See `ADR-002`.
@@ -55,32 +55,39 @@ SPEC-001 → REPO-001 → GRAPH-001 ─┬─→ DATA-001 ─→ GHIDRA-001 ─�
 `artifacts/**`. Nothing else may create them. Each node's contract is in
 `prompts/<NODE-ID>.md`.
 
-## NOW — the agent exists and is unmeasured
+## NOW — the measurement exists, the measurement subject does not
 
-`EVAL-AGENT-001` is `READY`. `AGENT-001` interprets tool output into claims whose
-citations are checked by replay, but nothing yet says whether those claims are
-any good, and the node deliberately does not grade itself.
+`EVAL-AGENT-001` has passed: the deterministic evaluator is complete and its
+scorer is verified against an adversarial corpus that plants each defect it
+claims to detect.
 
-One decision is owed before that node starts: **what it scores**. The agent runs
-against test doubles today, and scoring doubles measures the doubles. The
-options are a real provider adapter, which is separately authorized work, or a
-recorded-transcript corpus replayed deterministically. A transcript corpus lets
-the measurement machinery be built and verified now, with the honest limit that
-verified scoring machinery is not the same as a baseline of a real model.
+`GATE-AGENT-MVP` is graph-ready and **cannot honestly pass**. Every transcript
+in the corpus carries a scripted model reply, so the gate would be certifying a
+measurement of nothing. The evaluator says so itself: the run reports
+`provenance=authored` and `sufficient_for_GATE-AGENT-MVP=False`.
 
-That ordering is the same argument as `GATE-STATIC-MVP`: make the measurement
-trustworthy before the thing being measured arrives.
+The next product boundary is therefore genuine model execution:
+
+```text
+live provider -> frozen transcript -> existing deterministic evaluator
+```
+
+Nothing in the evaluator changes to consume a real transcript. What is missing
+is one adapter behind the existing `ModelProvider` protocol, and it needs a
+dependency and an API key, so it is a scope and authorization decision rather
+than something to assume. No such node exists yet.
+
+Semantic metrics stay unmeasured until two blinded human reviewers adjudicate;
+authored labels verify the scorer and never reach quorum.
 
 ## NEXT
 
-- `AGENT-001` — bounded investigator agent over the existing `ToolRegistry`,
-  producing evidence-backed explanations whose citations resolve.
-- `EVAL-AGENT-001` — measure citation validity, unsupported claims, and tool
-  hallucination against hidden ground truth. Baseline classification accuracy;
-  do not gate it before seeing it.
-- `GATE-AGENT-MVP` — verification node. Blocks emulation and real firmware.
-- MPC5xx dataset work — a separate measurable step, after first-agent
-  evaluation rather than alongside it.
+- A provider adapter node, once authorized — one implementation of
+  `ModelProvider`, whose only job is `live provider -> frozen transcript`.
+- Human adjudication of a genuine transcript by two blinded reviewers, which is
+  what unlocks the semantic metrics.
+- `GATE-AGENT-MVP` — verification node, after a real baseline exists.
+- MPC5xx dataset work — still a separate measurable step.
 
 ## LATER
 

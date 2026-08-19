@@ -395,7 +395,7 @@ nodes:
     title: Deterministic agent evaluation
     depends_on:
       - AGENT-001
-    status: PENDING
+    status: PASSED
     worker: coding-agent
     prompt: prompts/EVAL-AGENT-001.md
     # Subtrees of EVAL-STATIC-001's paths. The overlap is ordered and therefore
@@ -410,7 +410,22 @@ nodes:
       commands:
         - uv run pytest
     retry_budget: 2
-    note: Measures citation validity and unsupported claims, not prose quality.
+    # Verified after PR #32. The deterministic evaluator is complete: frozen
+    # transcript plus hidden ground truth yields metrics, with numerator and
+    # denominator on every rate, reproducible for a fixed transcript, and no
+    # model judging anything ground truth can decide.
+    #
+    # What it has measured and what it has not are different things, and the
+    # distinction is the reason GATE-AGENT-MVP is still shut. The corpus holds
+    # real tool output through the real agent, so the evidential machinery -
+    # citation validity, schema compliance, unsupported claims, tool
+    # hallucination - was measured on genuine agent behaviour. Only the model's
+    # reply was scripted, so nothing here is a baseline of a model, and the
+    # corpus is adversarial by construction: the gate fails over it on purpose.
+    #
+    # Semantic metrics stay unmeasured pending two blinded human reviewers.
+    # Authored labels compute them to verify the scorer and are marked as such.
+    note: Verified after PR #32; the evaluator is complete, a model baseline is not.
 
   GATE-AGENT-MVP:
     title: Agent MVP gate
