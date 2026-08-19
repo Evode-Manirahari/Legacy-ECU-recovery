@@ -1,0 +1,13 @@
+{
+  "classification_correct": false,
+  "judgements": [
+    {
+      "claim_index": 0,
+      "critical": false,
+      "semantically_supported": true
+    }
+  ],
+  "kind": "authored",
+  "reviewer": "authored-a",
+  "transcript_id": "05-honest-unknown"
+}

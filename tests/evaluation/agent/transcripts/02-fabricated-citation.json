@@ -1,0 +1,123 @@
+{
+  "expects": {
+    "citations": 1,
+    "claims": 1,
+    "demotions": 1,
+    "fabricated_citations": 1,
+    "factual_claims": 0,
+    "parsed": true,
+    "raw_factual_claims": 1,
+    "unsupported_factual_claims": 1,
+    "valid_citations": 0
+  },
+  "id": "02-fabricated-citation",
+  "investigation": {
+    "citation_checks": [
+      {
+        "fabricated": true,
+        "fact_id": "F900",
+        "reason": "no fact 'F900' was gathered; the call was never made",
+        "resolved": false
+      }
+    ],
+    "claims": [
+      {
+        "citations": [],
+        "confidence": 0.0,
+        "statement": "writes directly to an injector register",
+        "subject": "0x100000f00",
+        "support": "unknown"
+      }
+    ],
+    "demotions": [
+      "writes directly to an injector register"
+    ],
+    "fabricated_citation_count": 1,
+    "fact_sheet": {
+      "facts": [
+        {
+          "arguments": {},
+          "evidence_key": "E-a74e9636f426f5892456a5ea7a3a66b6883a330623d3ed18a365817e057233e7",
+          "id": "F000",
+          "result_digest": "8596de29cd88f069cd0643668663e78639cde69c0f56dfd1dd175c389effa0e0",
+          "subject": "0x100000f00",
+          "summary": "program firmware.stripped is x86:LE:64:default (x86, little-endian, 64-bit) with 6 functions and 2 analysis warning(s)",
+          "tool": "binary_summary"
+        },
+        {
+          "arguments": {
+            "function_id": "0x100000f00",
+            "instruction_limit": 64
+          },
+          "evidence_key": "E-ea3d44521b3ed4c27fc8856ac19f87b655a6668124c0037aca52f825d9d1a7e9",
+          "id": "F001",
+          "result_digest": "6469b4f3f383c153336d77f70be510bc5503b00f4ce1d6181a48090bb5830fca",
+          "subject": "0x100000f00",
+          "summary": "function 0x100000f00 named FUN_100000f00, 35 bytes, spanning 0x100000f00-0x100000f22, 1 caller(s) and 3 callee(s)",
+          "tool": "inspect_function"
+        },
+        {
+          "arguments": {
+            "function_id": "0x100000f00",
+            "instruction_limit": 64
+          },
+          "evidence_key": "E-7c6cb842c500489792ccb6e1f6eeeeb592da4162aaf0efbf60da63a1dd05bc80",
+          "id": "F002",
+          "result_digest": "6469b4f3f383c153336d77f70be510bc5503b00f4ce1d6181a48090bb5830fca",
+          "subject": "0x100000f00",
+          "summary": "disassembly of 0x100000f00: 0x100000f00 PUSH RBP, 0x100000f01 MOV RBP, RSP, 0x100000f04 PUSH RBX, 0x100000f05 PUSH RAX, 0x100000f06 MOV EBX, EDX, 0x100000f08 CALL 0x100000eb0, 0x100000f0d MOV EDI, EAX, 0x100000f0f MOV ESI, EBX, 0x100000f11 CALL 0x100000ec0, 0x100000f16 MOV EDI, EAX, 0x100000f18 ADD RSP, 0x8, 0x100000f1c POP RBX, 0x100000f1d POP RBP, 0x100000f1e JMP 0x100000ee0",
+          "tool": "inspect_function"
+        },
+        {
+          "arguments": {
+            "function_id": "0x100000f00",
+            "limit": 20
+          },
+          "evidence_key": "E-5ffa7426f69d5d4ea1534d4418592e6ea8331110b68ce1ea18462c2a6c2a4671",
+          "id": "F003",
+          "result_digest": "e2bf7035a6463141a6b1075b90080071bfb4968d8354225e1d3c95688aaa5950",
+          "subject": "0x100000f00",
+          "summary": "0x100000f00 is called by: 0x100000f30",
+          "tool": "get_callers"
+        },
+        {
+          "arguments": {
+            "function_id": "0x100000f00",
+            "limit": 20
+          },
+          "evidence_key": "E-0f267a94a48be37e660d56500c221c1acda8c2401990ada6c8b229d283dfd8f2",
+          "id": "F004",
+          "result_digest": "afcccd2f0e262a4d70afa843cabc61033a45d1cf107b0cd80e535d31b91183b9",
+          "subject": "0x100000f00",
+          "summary": "0x100000f00 calls: 0x100000eb0, 0x100000ec0, 0x100000ee0",
+          "tool": "get_callees"
+        },
+        {
+          "arguments": {
+            "function_id": "0x100000f00"
+          },
+          "evidence_key": "E-220071c7930e473d729b938d42df3ff3e64ec5e22b7dda0be60521030d58a34c",
+          "id": "F005",
+          "result_digest": "6dbfcc91c1b44789675ec397c732254fd77bd3d44c7026275d552c663a540733",
+          "subject": "0x100000f00",
+          "summary": "decompilation of 0x100000f00: \nvoid FUN_100000f00(undefined8 param_1,undefined8 param_2,undefined4 param_3)\n\n{\n  undefined4 uVar1;\n  \n  uVar1 = FUN_100000eb0();\n  uVar1 = FUN_100000ec0(uVar1,param_3);\n  FUN_100000ee0(uVar1);\n  return;\n}\n\n",
+          "tool": "decompile_function"
+        }
+      ],
+      "refusals": [],
+      "subject": "0x100000f00"
+    },
+    "failure": null,
+    "ground_truth_role": "control_output",
+    "model": {
+      "name": "authored",
+      "provider": "scripted"
+    },
+    "subject": "0x100000f00"
+  },
+  "provenance": "authored",
+  "sample_id": "multi_function_pipeline_v1",
+  "scenario": "a claim citing a fact that was never gathered",
+  "schema_version": 1,
+  "subject": "0x100000f00"
+}

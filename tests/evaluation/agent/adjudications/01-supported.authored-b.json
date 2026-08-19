@@ -1,0 +1,18 @@
+{
+  "classification_correct": true,
+  "judgements": [
+    {
+      "claim_index": 0,
+      "critical": false,
+      "semantically_supported": true
+    },
+    {
+      "claim_index": 1,
+      "critical": false,
+      "semantically_supported": true
+    }
+  ],
+  "kind": "authored",
+  "reviewer": "authored-b",
+  "transcript_id": "01-supported"
+}

@@ -1,0 +1,13 @@
+{
+  "classification_correct": false,
+  "judgements": [
+    {
+      "claim_index": 0,
+      "critical": true,
+      "semantically_supported": false
+    }
+  ],
+  "kind": "authored",
+  "reviewer": "authored-a",
+  "transcript_id": "04-unsupported-assertion"
+}

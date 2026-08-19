@@ -1,0 +1,13 @@
+{
+  "classification_correct": true,
+  "judgements": [
+    {
+      "claim_index": 0,
+      "critical": true,
+      "semantically_supported": true
+    }
+  ],
+  "kind": "authored",
+  "reviewer": "authored-b",
+  "transcript_id": "03-mixed-citations"
+}
