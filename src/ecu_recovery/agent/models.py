@@ -8,8 +8,11 @@ material it is given.
 
 A **citation** points at a fact by id. It is checkable twice over: the id must
 belong to a fact that was actually gathered, and re-running that fact's call
-must still produce it. Citing a tool call that was never issued is therefore
-detectable rather than merely discouraged.
+must produce *the same result*. Success alone is not reproduction - a tool can
+succeed and return something else - so each fact records a digest of the
+canonical result it came from and replay compares against it. Citing a tool call
+that was never issued is therefore detectable, and so is citing one whose answer
+has moved.
 
 A **claim** is an interpretation, and it carries how well supported it is.
 `OBSERVED` requires a citation that survives checking. `UNKNOWN` is a first-class
@@ -19,9 +22,28 @@ will say something else instead, and that is worse.
 
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
+
+
+def canonical_digest(payload: Any) -> str:
+    """A stable fingerprint of a tool result.
+
+    Sorted keys and no incidental whitespace, so two runs that returned the same
+    data agree byte for byte regardless of dict ordering. Truncated to sixteen
+    hex characters: this identifies a result, it does not defend against an
+    adversary constructing a collision.
+    """
+    rendered = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
+    return hashlib.sha256(rendered.encode("utf-8")).hexdigest()[:16]
+
+
+def subject_tag(subject: str) -> str:
+    """The subject, as it appears inside an evidence key."""
+    return subject[2:] if subject.startswith("0x") else subject
 
 
 class SupportLevel(StrEnum):
@@ -38,21 +60,35 @@ class SupportLevel(StrEnum):
 
 @dataclass(frozen=True)
 class Fact:
-    """One tool result, with the call that produced it."""
+    """One tool result, with the call that produced it and a digest of it.
+
+    `id` stays short - the model has to copy it into a citation, and every extra
+    character is a chance to mistype one. Persistence needs global identity
+    instead, so `evidence_key` scopes the same fact by subject. Both derive from
+    here so nothing downstream can invent a second convention.
+    """
 
     id: str
     tool: str
     arguments: dict[str, Any]
     subject: str
     summary: str
+    result_digest: str = ""
+
+    @property
+    def evidence_key(self) -> str:
+        """Globally unique within a binary. Two subjects never collide."""
+        return f"E-{subject_tag(self.subject)}-{self.id}"
 
     def as_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
+            "evidence_key": self.evidence_key,
             "tool": self.tool,
             "arguments": dict(self.arguments),
             "subject": self.subject,
             "summary": self.summary,
+            "result_digest": self.result_digest,
         }
 
 

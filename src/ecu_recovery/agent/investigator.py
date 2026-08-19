@@ -6,12 +6,25 @@ makes is checked back against them afterwards. A wrong answer is therefore
 attributable: retrieval already happened and is reproducible, so what is left is
 interpretation.
 
-Checking is not a formality. A citation naming a fact id that was never gathered
-is recorded as **fabricated** - the agent claiming a tool said something it
-never said - and any claim resting on citations that do not survive is demoted
-to `unknown` rather than being quietly kept. Demotion is recorded too, because
-"the agent overreached and was caught" and "the agent was careful" should not
-produce the same transcript.
+Checking is not a formality, and three details decide whether it means anything.
+
+Replay compares the **result**, not the exit status. A tool can succeed and
+return something else; a citation that only proves the call still works proves
+nothing about the claim resting on it.
+
+**Every** citation on a factual claim must survive. Requiring only one to hold
+would let a claim carrying one real citation and one fabricated one stand as
+observed, which is exactly the shape a plausible-sounding wrong answer takes.
+
+A model-authored claim never becomes mechanically known. The model labelling its
+own statement "observed" is not a measurement, and `Certainty.KNOWN` is reserved
+for what a deterministic tool established. The label is kept in the transcript
+because EVAL-AGENT-001 needs to score whether the model classified itself
+correctly; it just does not get to promote itself in the evidence store.
+
+Demotion is recorded rather than applied silently, because "the agent overreached
+and was caught" and "the agent was careful" must not produce the same
+transcript.
 """
 
 from __future__ import annotations
@@ -27,6 +40,7 @@ from .models import (
     Investigation,
     InvestigationBudget,
     SupportLevel,
+    canonical_digest,
 )
 from .parsing import ReplyFormatError, parse_claims
 from .prompting import build_request
@@ -35,8 +49,14 @@ from .provider import ModelProvider, ModelUnavailableError, UnconfiguredProvider
 #: Claims at this level or stronger must survive citation checking.
 _REQUIRES_SUPPORT = (SupportLevel.OBSERVED, SupportLevel.INFERRED)
 
+#: A model-authored claim is an interpretation whatever the model calls it, so
+#: OBSERVED and INFERRED both persist as INFERRED. `Certainty.KNOWN` belongs to
+#: what a tool established, and tool facts already become mechanically observed
+#: Evidence. Promoting a claim to KNOWN would let the model's self-assessment
+#: overwrite that distinction. If a deterministic semantic validator ever exists,
+#: it - not the model - is what would justify changing this.
 _CERTAINTY_FOR = {
-    SupportLevel.OBSERVED: Certainty.KNOWN,
+    SupportLevel.OBSERVED: Certainty.INFERRED,
     SupportLevel.INFERRED: Certainty.INFERRED,
     SupportLevel.UNKNOWN: Certainty.UNKNOWN,
 }
@@ -48,13 +68,13 @@ def check_citation(
     context: ToolContext,
     registry: ToolRegistry = REGISTRY,
 ) -> CitationCheck:
-    """Resolve one citation, twice.
+    """Resolve one citation: gathered, re-runnable, and still saying the same thing.
 
-    First the fact id must belong to something actually gathered - a citation
-    that fails here names a tool result the agent never obtained, which is
-    fabrication rather than error. Then the recorded call is re-run and must
-    still succeed, so a citation is a reproducible pointer rather than a claim
-    about a moment that has passed.
+    Three ways to fail, and they are not the same failure. An id that was never
+    gathered means the agent cited a call it never made - fabrication. A call
+    that no longer succeeds means the fact is no longer obtainable. A call that
+    succeeds with a different result means the fact has moved, and a citation
+    that resolved on exit status alone would have hidden that.
     """
     fact = sheet.by_id(citation.fact_id)
     if fact is None:
@@ -65,20 +85,30 @@ def check_citation(
             reason=f"no fact {citation.fact_id!r} was gathered; the call was never made",
         )
     replay = registry.call(fact.tool, context, fact.arguments)
-    if not replay.ok:
+    if not replay.ok or replay.data is None:
         error = replay.error
         return CitationCheck(
             citation=citation,
             resolved=False,
             reason=(
-                f"re-running {fact.tool} did not reproduce the fact: "
+                f"re-running {fact.tool} did not succeed: "
                 f"{'unknown error' if error is None else error.code}"
+            ),
+        )
+    replayed = canonical_digest(replay.data)
+    if replayed != fact.result_digest:
+        return CitationCheck(
+            citation=citation,
+            resolved=False,
+            reason=(
+                f"{fact.tool} re-ran but returned different data: recorded "
+                f"{fact.result_digest}, replayed {replayed}"
             ),
         )
     return CitationCheck(
         citation=citation,
         resolved=True,
-        reason=f"{fact.tool} re-ran and reproduced fact {fact.id}",
+        reason=f"{fact.tool} re-ran and reproduced fact {fact.id} ({fact.result_digest})",
     )
 
 
@@ -130,8 +160,12 @@ def investigate(
             check_citation(citation, sheet, context, registry) for citation in claim.citations
         ]
         checks.extend(claim_checks)
-        unsupported = claim.support in _REQUIRES_SUPPORT and not any(
-            item.resolved for item in claim_checks
+        # Every citation must hold, not merely one of them. A claim carrying a
+        # real citation beside a fabricated one is the shape a confident wrong
+        # answer takes, and `any` would wave it through. An uncited factual
+        # claim is unsupported by definition.
+        unsupported = claim.support in _REQUIRES_SUPPORT and (
+            not claim_checks or not all(item.resolved for item in claim_checks)
         )
         if unsupported:
             # Kept, not dropped: an overreach that vanishes is invisible to the
@@ -169,7 +203,7 @@ def to_evidence(sheet: FactSheet) -> tuple[Evidence, ...]:
     """
     return tuple(
         Evidence(
-            key=f"E-{fact.id}",
+            key=fact.evidence_key,
             kind=EvidenceKind.STATIC_PROPERTY,
             summary=fact.summary[:400],
             source=f"tools:{fact.tool}",
@@ -183,23 +217,31 @@ def to_evidence(sheet: FactSheet) -> tuple[Evidence, ...]:
 def to_hypotheses(investigation: Investigation) -> tuple[tuple[Hypothesis, tuple[str, ...]], ...]:
     """Map claims onto hypotheses, paired with the evidence keys they cite.
 
-    A KNOWN claim must carry confidence 1.0 for the evidence model to accept it,
-    and an OBSERVED claim is precisely one a tool stated directly, so the
-    conversion is faithful rather than convenient.
+    Evidence keys come from the `Fact` itself, the same place `to_evidence` gets
+    them, so a hypothesis can never reference a key that was not generated. A
+    citation whose fact is absent is dropped rather than emitted as a dangling
+    reference - it cannot occur on a surviving factual claim, because such a
+    claim was demoted, but persistence should not depend on that argument
+    holding somewhere else.
     """
+    sheet = investigation.fact_sheet
     paired: list[tuple[Hypothesis, tuple[str, ...]]] = []
     for claim in investigation.claims:
         certainty = _CERTAINTY_FOR[claim.support]
-        confidence = 1.0 if certainty is Certainty.KNOWN else claim.confidence
+        keys: list[str] = []
+        for citation in claim.citations:
+            fact = sheet.by_id(citation.fact_id)
+            if fact is not None:
+                keys.append(fact.evidence_key)
         paired.append(
             (
                 Hypothesis(
                     subject=claim.subject,
                     claim=claim.statement,
                     certainty=certainty,
-                    confidence=confidence,
+                    confidence=claim.confidence,
                 ),
-                tuple(f"E-{item.fact_id}" for item in claim.citations),
+                tuple(keys),
             )
         )
     return tuple(paired)

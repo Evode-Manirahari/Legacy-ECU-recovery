@@ -14,7 +14,13 @@ from __future__ import annotations
 import json
 
 import pytest
-from agent_support import SUBJECT, ScriptedProvider, fake_context, unavailable_provider
+from agent_support import (
+    SUBJECT,
+    FakeSession,
+    ScriptedProvider,
+    fake_context,
+    unavailable_provider,
+)
 
 from ecu_recovery.agent import (
     Citation,
@@ -32,7 +38,9 @@ from ecu_recovery.agent import (
     to_hypotheses,
 )
 from ecu_recovery.agent.provider import ModelProvider, ModelUnavailableError
+from ecu_recovery.analysis.models import function_id_for
 from ecu_recovery.models import Certainty
+from ecu_recovery.tools import ToolContext
 
 
 def reply(*claims: dict[str, object]) -> str:
@@ -408,12 +416,240 @@ def test_claims_map_onto_hypotheses_the_evidence_model_accepts() -> None:
 
     paired = to_hypotheses(result)
 
+    # OBSERVED persists as INFERRED: a model labelling its own sentence
+    # "observed" is not a measurement, and KNOWN is reserved for what a tool
+    # established. The label itself stays in the transcript for scoring.
     assert [h.certainty for h, _ in paired] == [
-        Certainty.KNOWN,
+        Certainty.INFERRED,
         Certainty.INFERRED,
         Certainty.UNKNOWN,
     ]
-    # KNOWN claims must carry full confidence or the evidence model rejects them.
-    assert paired[0][0].confidence == 1.0
-    assert paired[0][1] == ("E-F001",)
+    assert paired[0][0].confidence == 0.8
+    assert paired[0][1] == (f"E-{SUBJECT[2:]}-F001",)
     assert paired[2][1] == ()
+
+
+# --- review findings, each pinned by the case that exposed it ---
+
+
+def test_a_replayed_call_that_returns_different_data_does_not_resolve() -> None:
+    """Success is not reproduction.
+
+    The tool still works and still answers; it just answers something else. A
+    check that only looked at the exit status called this resolved, which let a
+    claim keep citing a fact that no longer said what it was cited for.
+    """
+    context = ToolContext(session=FakeSession(drifting_tool="get_callers"))
+    sheet = gather_facts(context, SUBJECT)
+    fact = next(item for item in sheet.facts if item.tool == "get_callers")
+
+    check = check_citation(Citation(fact.id), sheet, context)
+
+    assert check.resolved is False
+    assert check.fabricated is False
+    assert "different data" in check.reason
+    assert fact.result_digest in check.reason
+
+
+def test_a_claim_resting_on_drifted_data_is_demoted() -> None:
+    # The fact id is read from a stable session: gathering twice from the
+    # drifting one would consume the drift before `investigate` ever ran, and
+    # the test would pass for the wrong reason.
+    drifted = next(
+        item for item in gather_facts(fake_context(), SUBJECT).facts if item.tool == "get_callers"
+    )
+    context = ToolContext(session=FakeSession(drifting_tool="get_callers"))
+    provider = ScriptedProvider(
+        reply=reply(
+            {
+                "statement": "is called from exactly one site",
+                "support": "observed",
+                "confidence": 0.9,
+                "citations": [drifted.id],
+            }
+        )
+    )
+
+    result = investigate(context, SUBJECT, provider)
+
+    assert result.claims[0].support is SupportLevel.UNKNOWN
+    assert result.demotions == ("is called from exactly one site",)
+
+
+def test_every_fact_records_a_digest_of_the_result_it_came_from() -> None:
+    sheet = gather_facts(fake_context(), SUBJECT)
+
+    assert sheet.facts
+    assert all(item.result_digest for item in sheet.facts)
+
+
+def test_one_fabricated_citation_beside_a_valid_one_still_demotes_the_claim() -> None:
+    """The shape a confident wrong answer takes: real evidence plus invented evidence."""
+    context = fake_context()
+    sheet = gather_facts(context, SUBJECT)
+    provider = ScriptedProvider(
+        reply=reply(
+            {
+                "statement": "drives the injector",
+                "support": "observed",
+                "confidence": 0.95,
+                "citations": [sheet.facts[0].id, "F999"],
+            }
+        )
+    )
+
+    result = investigate(context, SUBJECT, provider)
+
+    assert result.claims[0].support is SupportLevel.UNKNOWN
+    assert result.demotions == ("drives the injector",)
+    # Both checks survive so the overreach remains countable downstream.
+    assert len(result.checks) == 2
+    assert len(result.fabricated_citations) == 1
+    assert any(item.resolved for item in result.checks)
+
+
+def test_a_factual_claim_with_no_citation_at_all_is_demoted() -> None:
+    provider = ScriptedProvider(
+        reply=reply(
+            {
+                "statement": "computes engine speed",
+                "support": "observed",
+                "confidence": 0.9,
+                "citations": [],
+            }
+        )
+    )
+
+    result = investigate(fake_context(), SUBJECT, provider)
+
+    assert result.claims[0].support is SupportLevel.UNKNOWN
+
+
+def test_no_surviving_hypothesis_references_evidence_that_does_not_exist() -> None:
+    context = fake_context()
+    sheet = gather_facts(context, SUBJECT)
+    provider = ScriptedProvider(
+        reply=reply(
+            {
+                "statement": "adds one",
+                "support": "inferred",
+                "confidence": 0.5,
+                "citations": [sheet.facts[0].id],
+            },
+            {
+                "statement": "invented",
+                "support": "observed",
+                "confidence": 0.9,
+                "citations": ["F999"],
+            },
+        )
+    )
+    result = investigate(context, SUBJECT, provider)
+
+    available = {item.key for item in to_evidence(result.fact_sheet)}
+    referenced = {key for _, keys in to_hypotheses(result) for key in keys}
+
+    assert referenced <= available, f"dangling evidence references: {referenced - available}"
+
+
+def test_a_model_claiming_observation_cannot_produce_a_known_certainty() -> None:
+    """Tools derive facts; the model interprets them.
+
+    The model labelling its own sentence "observed" is not a measurement, so it
+    must not reach the strongest certainty the evidence model has.
+    """
+    context = fake_context()
+    sheet = gather_facts(context, SUBJECT)
+    provider = ScriptedProvider(
+        reply=reply(
+            {
+                "statement": "increments a counter",
+                "support": "observed",
+                "confidence": 1.0,
+                "citations": [sheet.facts[0].id],
+            }
+        )
+    )
+
+    result = investigate(context, SUBJECT, provider)
+
+    # The label survives in the transcript, because EVAL-AGENT-001 must score it.
+    assert result.claims[0].support is SupportLevel.OBSERVED
+    # It does not survive into the evidence store.
+    # INFERRED, not KNOWN. The stronger statement - that no support level
+    # reaches KNOWN - is asserted separately below, where mypy cannot narrow the
+    # type to a single member and quietly make the check vacuous.
+    hypothesis, _ = to_hypotheses(result)[0]
+    assert hypothesis.certainty is Certainty.INFERRED
+
+
+def test_no_claim_of_any_support_level_maps_to_known() -> None:
+    context = fake_context()
+    sheet = gather_facts(context, SUBJECT)
+    provider = ScriptedProvider(
+        reply=reply(
+            {
+                "statement": "a",
+                "support": "observed",
+                "confidence": 1.0,
+                "citations": [sheet.facts[0].id],
+            },
+            {
+                "statement": "b",
+                "support": "inferred",
+                "confidence": 0.5,
+                "citations": [sheet.facts[1].id],
+            },
+            {"statement": "c", "support": "unknown", "confidence": 0.0},
+        )
+    )
+
+    result = investigate(context, SUBJECT, provider)
+
+    assert all(h.certainty is not Certainty.KNOWN for h, _ in to_hypotheses(result))
+
+
+def test_two_subjects_produce_disjoint_evidence_keys() -> None:
+    """Fact ids restart per sheet; evidence keys must not, or persistence collides."""
+    context = fake_context()
+    first = gather_facts(context, SUBJECT)
+    second = gather_facts(context, function_id_for(0x2000))
+
+    first_keys = {item.key for item in to_evidence(first)}
+    second_keys = {item.key for item in to_evidence(second)}
+
+    assert first_keys and second_keys
+    assert first_keys.isdisjoint(second_keys)
+    # The compact per-sheet ids are still shared, which is why scoping matters.
+    assert {item.id for item in first.facts} & {item.id for item in second.facts}
+
+
+def test_evidence_keys_are_deterministic_across_runs() -> None:
+    first = {item.key for item in to_evidence(gather_facts(fake_context(), SUBJECT))}
+    second = {item.key for item in to_evidence(gather_facts(fake_context(), SUBJECT))}
+
+    assert first == second
+
+
+def test_to_evidence_and_to_hypotheses_agree_on_every_key() -> None:
+    """One derivation, used by both, so the two cannot drift apart."""
+    context = fake_context()
+    sheet = gather_facts(context, SUBJECT)
+    provider = ScriptedProvider(
+        reply=reply(
+            {
+                "statement": "adds one",
+                "support": "inferred",
+                "confidence": 0.6,
+                "citations": [sheet.facts[1].id],
+            }
+        )
+    )
+    result = investigate(context, SUBJECT, provider)
+
+    available = {item.key for item in to_evidence(result.fact_sheet)}
+    _, keys = to_hypotheses(result)[0]
+
+    assert keys
+    assert set(keys) <= available
+    assert keys[0].startswith(f"E-{SUBJECT[2:]}-")

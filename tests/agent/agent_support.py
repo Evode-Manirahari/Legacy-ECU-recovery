@@ -64,9 +64,20 @@ def unavailable_provider() -> ScriptedProvider:
 class FakeSession(StaticAnalysisSession):
     """Enough of a session to drive the tool layer, with no engine behind it."""
 
-    def __init__(self, *, decompiles: bool = True, failing_tool: str | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        decompiles: bool = True,
+        failing_tool: str | None = None,
+        drifting_tool: str | None = None,
+    ) -> None:
         self._decompiles = decompiles
         self._failing_tool = failing_tool
+        # A tool that succeeds but answers differently on a later call. This is
+        # what distinguishes "the call still works" from "the fact still holds",
+        # and nothing else in the suite can produce that state.
+        self._drifting_tool = drifting_tool
+        self._calls: dict[str, int] = {}
         self._functions = (
             FunctionRecord(
                 id=SUBJECT,
@@ -135,6 +146,9 @@ class FakeSession(StaticAnalysisSession):
 
     def get_callers(self, function_id: str) -> tuple[FunctionRecord, ...]:
         self._guard("get_callers")
+        self._calls["get_callers"] = self._calls.get("get_callers", 0) + 1
+        if self._drifting_tool == "get_callers" and self._calls["get_callers"] > 1:
+            return (self._functions[1], self._functions[2])
         return (self._functions[1],)
 
     def get_callees(self, function_id: str) -> tuple[FunctionRecord, ...]:

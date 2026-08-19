@@ -16,7 +16,7 @@ from __future__ import annotations
 from typing import Any
 
 from ..tools import REGISTRY, ToolContext, ToolRegistry
-from .models import Fact, FactSheet, InvestigationBudget
+from .models import Fact, FactSheet, InvestigationBudget, canonical_digest
 
 
 def _fact_id(index: int) -> str:
@@ -48,7 +48,7 @@ def gather_facts(
     facts: list[Fact] = []
     refusals: list[tuple[str, str]] = []
 
-    def record(tool: str, arguments: dict[str, Any], summary: str) -> None:
+    def record(tool: str, arguments: dict[str, Any], summary: str, payload: dict[str, Any]) -> None:
         facts.append(
             Fact(
                 id=_fact_id(len(facts)),
@@ -56,6 +56,10 @@ def gather_facts(
                 arguments=dict(arguments),
                 subject=subject,
                 summary=summary,
+                # The digest is what makes a citation checkable later. Without
+                # it, replay can only prove the call still succeeds, which is
+                # not the same as proving it still says the same thing.
+                result_digest=canonical_digest(payload),
             )
         )
 
@@ -78,12 +82,18 @@ def gather_facts(
             f"({program['processor']}, {program['endian']}-endian, "
             f"{program['address_size_bits']}-bit) with {summary['function_count']} functions "
             f"and {summary['analysis_warning_count']} analysis warning(s)",
+            summary,
         )
 
     inspect_args = {"function_id": subject, "instruction_limit": budget.max_instructions}
     inspected = call("inspect_function", inspect_args)
     if inspected is not None:
-        record("inspect_function", inspect_args, _summarize_function(inspected["function"]))
+        record(
+            "inspect_function",
+            inspect_args,
+            _summarize_function(inspected["function"]),
+            inspected,
+        )
         listing = ", ".join(
             f"{item['address']} {item['mnemonic']} {item['operands']}".strip()
             for item in inspected["instructions"]
@@ -94,19 +104,20 @@ def gather_facts(
             f"disassembly of {subject}"
             + (" (truncated)" if inspected["instructions_truncated"] else "")
             + f": {listing}",
+            inspected,
         )
 
     callers_args = {"function_id": subject, "limit": budget.max_callers}
     callers = call("get_callers", callers_args)
     if callers is not None:
         names = ", ".join(item["id"] for item in callers["callers"]) or "none"
-        record("get_callers", callers_args, f"{subject} is called by: {names}")
+        record("get_callers", callers_args, f"{subject} is called by: {names}", callers)
 
     callees_args = {"function_id": subject, "limit": budget.max_callees}
     callees = call("get_callees", callees_args)
     if callees is not None:
         names = ", ".join(item["id"] for item in callees["callees"]) or "none"
-        record("get_callees", callees_args, f"{subject} calls: {names}")
+        record("get_callees", callees_args, f"{subject} calls: {names}", callees)
 
     if budget.decompile:
         decompile_args = {"function_id": subject}
@@ -119,6 +130,7 @@ def gather_facts(
                     f"decompilation of {subject}"
                     + (" (truncated)" if decompiled["text_truncated"] else "")
                     + f": {decompiled['text']}",
+                    decompiled,
                 )
             else:
                 # A decompiler that gave up is information, but it is not a fact
