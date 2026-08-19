@@ -23,7 +23,7 @@ from typing import Any
 
 from ..groundtruth import DEFAULT_SAMPLES_ROOT
 from ..models import Ratio
-from .adjudication import ReviewPanel
+from .adjudication import REQUIRED_HUMAN_REVIEWERS, ReviewPanel
 from .models import (
     FACTUAL_SUPPORT,
     AgentMetrics,
@@ -218,41 +218,67 @@ def critical_unsupported_claims(
 
     This is a **count**, and a count claims completeness in a way a ratio does
     not. `classification_accuracy` publishes its own denominator, so a partly
-    reviewed corpus is visible in the number itself; "0 critical unsupported
-    claims" carries no such qualifier and would be read as "there are none".
-    So every claim in the population must be fully reconciled, and a single
-    claim that is not - missing both verdicts, missing one, or disputed - makes
-    the whole measurement unmeasured.
+    reviewed corpus shows in the number itself; "0 critical unsupported claims"
+    carries no such qualifier and reads as "there are none" when it can mean
+    "nobody looked". Three separate conditions therefore gate it, and each was a
+    real hole before it was one:
 
-    That distinction is worth stating plainly, because the earlier version got
-    it wrong in a way that mattered: **reviewer quorum is not adjudication
-    coverage.** Two reviewers filing on one claim proves two people looked at
-    that claim. It proves nothing about the claim beside it, and a corpus of one
-    reviewed benign claim plus one nobody judged must not report zero.
+    **Reviewer quorum is not adjudication coverage.** Two reviewers filing on
+    one claim proves two people read that claim, not the one beside it.
+
+    **Reviewer presence is not field-level quorum.** Two reviewers on a
+    transcript can leave a specific field on a specific claim answered by only
+    one of them. An abstention is not agreement.
+
+    **An authored label is not a reviewer.** Authored opinions may compute a
+    number so the scorer itself can be tested, but they never reach human
+    quorum and the result is never gate-eligible.
     """
     counted = 0
-    unresolved = 0
+    unreconciled = 0
     disputed = 0
+    without_field_quorum = 0
     for transcript in transcripts:
         for index in range(len(transcript.claims)):
             support = panel.claim_support(transcript.id, index)
             criticality = panel.claim_criticality(transcript.id, index)
             if not (support.settled and criticality.settled):
-                unresolved += 1
+                unreconciled += 1
                 if support.disagreed or criticality.disagreed:
                     disputed += 1
                 continue
+            if not (support.human_quorum and criticality.human_quorum):
+                without_field_quorum += 1
             if criticality.value is True and support.value is False:
                 counted += 1
 
-    if unresolved:
-        detail = f"{unresolved} claim(s) lack a reconciled verdict on support or criticality"
+    if unreconciled:
+        detail = f"{unreconciled} claim(s) lack a reconciled verdict on support or criticality"
         if disputed:
             detail += f", {disputed} of them disputed between reviewers"
         return Measurement.unmeasured(
             "critical_unsupported_claims",
             f"{detail}; a count over an incompletely judged corpus would read as "
             "'there are none' when it means 'nobody looked'",
+        )
+
+    if without_field_quorum:
+        # Human reviews that do not reach field-level quorum are not a weaker
+        # measurement, they are an unfinished review. Authored labels are a
+        # different case: they exist to exercise the scorer and say so.
+        if panel.fully_human:
+            return Measurement.unmeasured(
+                "critical_unsupported_claims",
+                f"{without_field_quorum} claim(s) had a required field adjudicated by "
+                f"fewer than {REQUIRED_HUMAN_REVIEWERS} distinct human reviewers; "
+                "reviewer presence on a transcript is not field-level quorum, and an "
+                "abstention is not agreement",
+            )
+        return Measurement(
+            "critical_unsupported_claims",
+            count=counted,
+            provenance="authored",
+            reason=_NO_QUORUM,
         )
 
     ids = [item.id for item in transcripts]

@@ -95,15 +95,35 @@ class Review:
 
 @dataclass(frozen=True)
 class Verdict:
-    """A reconciled label, or an explicit statement that there is not one."""
+    """A reconciled label, at two different strengths.
+
+    `settled` is the weak notion: somebody expressed an opinion and nobody
+    contradicted it. Useful for diagnostics, and not good enough for a gate,
+    because one reviewer answering while another abstains is one opinion.
+
+    `human_quorum` is the gate-grade notion: two distinct *human* reviewers each
+    adjudicated this specific field on this specific claim, and agreed. An
+    abstention is not agreement, and an authored label is not a reviewer.
+    """
 
     value: bool | None
     reviewers: int
+    human_reviewers: int = 0
     disagreed: bool = False
 
     @property
     def settled(self) -> bool:
+        """Weak: reconciled from whatever opinions exist. Diagnostics only."""
         return self.value is not None and not self.disagreed
+
+    @property
+    def human_quorum(self) -> bool:
+        """Gate-grade: two distinct humans adjudicated this field, and agreed."""
+        return (
+            self.value is not None
+            and not self.disagreed
+            and self.human_reviewers >= REQUIRED_HUMAN_REVIEWERS
+        )
 
 
 @dataclass(frozen=True)
@@ -140,39 +160,52 @@ class ReviewPanel:
     def fully_human(self) -> bool:
         return bool(self.reviews) and all(review.is_human for review in self.reviews)
 
-    def _reconcile(self, opinions: list[bool]) -> Verdict:
+    def _reconcile(self, opinions: list[tuple[bool, bool]]) -> Verdict:
+        """`opinions` is (value, is_human). An abstention never reaches here.
+
+        Counting humans separately is the whole point: presence on a transcript
+        is not the same as having adjudicated the field in question, and only
+        the latter can support a gate.
+        """
         if not opinions:
             return Verdict(value=None, reviewers=0)
-        if len(set(opinions)) > 1:
-            return Verdict(value=None, reviewers=len(opinions), disagreed=True)
-        return Verdict(value=opinions[0], reviewers=len(opinions))
+        humans = sum(1 for _, is_human in opinions if is_human)
+        values = {value for value, _ in opinions}
+        if len(values) > 1:
+            return Verdict(
+                value=None, reviewers=len(opinions), human_reviewers=humans, disagreed=True
+            )
+        return Verdict(value=opinions[0][0], reviewers=len(opinions), human_reviewers=humans)
 
     def claim_support(self, transcript_id: str, claim_index: int) -> Verdict:
-        opinions = [
-            judgement.semantically_supported
-            for review in self._for(transcript_id, human_only=False)
-            if (judgement := review.for_claim(claim_index)) is not None
-            and judgement.semantically_supported is not None
-        ]
-        return self._reconcile(opinions)
+        return self._reconcile(
+            [
+                (judgement.semantically_supported, review.is_human)
+                for review in self._for(transcript_id, human_only=False)
+                if (judgement := review.for_claim(claim_index)) is not None
+                and judgement.semantically_supported is not None
+            ]
+        )
 
     def claim_criticality(self, transcript_id: str, claim_index: int) -> Verdict:
-        opinions = [
-            judgement.critical
-            for review in self._for(transcript_id, human_only=False)
-            if (judgement := review.for_claim(claim_index)) is not None
-            and judgement.critical is not None
-        ]
-        return self._reconcile(opinions)
+        return self._reconcile(
+            [
+                (judgement.critical, review.is_human)
+                for review in self._for(transcript_id, human_only=False)
+                if (judgement := review.for_claim(claim_index)) is not None
+                and judgement.critical is not None
+            ]
+        )
 
     def classification(self, transcript_id: str) -> Verdict:
         """One verdict per subject, however many claims the transcript held."""
-        opinions = [
-            review.classification_correct
-            for review in self._for(transcript_id, human_only=False)
-            if review.classification_correct is not None
-        ]
-        return self._reconcile(opinions)
+        return self._reconcile(
+            [
+                (review.classification_correct, review.is_human)
+                for review in self._for(transcript_id, human_only=False)
+                if review.classification_correct is not None
+            ]
+        )
 
     def disagreements(self, transcript_id: str, claims: int) -> tuple[str, ...]:
         found: list[str] = []

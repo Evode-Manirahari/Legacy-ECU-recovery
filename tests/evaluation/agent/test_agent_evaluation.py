@@ -875,3 +875,167 @@ def test_the_committed_corpus_reports_incomplete_coverage() -> None:
 
     assert run.metrics.critical_unsupported_claims.measured is False
     assert run.metrics.review_disagreements
+
+
+# --- field-level quorum: presence is not adjudication ---
+
+
+def field_review(
+    reviewer: str,
+    supported: bool | None,
+    critical: bool | None,
+    kind: str = "human",
+) -> Review:
+    return Review(
+        transcript_id="t",
+        reviewer=reviewer,
+        kind=kind,
+        judgements=(
+            ClaimJudgement(claim_index=0, semantically_supported=supported, critical=critical),
+        ),
+    )
+
+
+def measure(*reviews: Review) -> Measurement:
+    return critical_unsupported_claims((one_claim("t"),), panel_of(*reviews))
+
+
+def test_a_reviewer_who_abstains_does_not_supply_field_quorum() -> None:
+    """The hole: two reviewer records, one of them silent on this claim.
+
+    Transcript quorum is satisfied and the weak reconciliation settles from the
+    single opinion, so the claim looked fully judged while only one person had
+    actually adjudicated it. An abstention is not agreement.
+    """
+    measurement = measure(
+        field_review("reviewer-a", supported=False, critical=True),
+        field_review("reviewer-b", supported=None, critical=None),
+    )
+
+    assert measurement.measured is False
+    assert measurement.gate_eligible is False
+    assert "field-level quorum" in measurement.reason
+
+
+def test_reviewers_splitting_the_fields_between_them_is_not_quorum() -> None:
+    """Two opinions across two fields is one opinion per field."""
+    measurement = measure(
+        field_review("reviewer-a", supported=False, critical=None),
+        field_review("reviewer-b", supported=None, critical=True),
+    )
+
+    assert measurement.measured is False
+
+
+def test_quorum_on_support_alone_is_not_enough() -> None:
+    measurement = measure(
+        field_review("reviewer-a", supported=False, critical=True),
+        field_review("reviewer-b", supported=False, critical=None),
+    )
+
+    assert measurement.measured is False
+
+
+def test_quorum_on_criticality_alone_is_not_enough() -> None:
+    measurement = measure(
+        field_review("reviewer-a", supported=False, critical=True),
+        field_review("reviewer-b", supported=None, critical=True),
+    )
+
+    assert measurement.measured is False
+
+
+def test_two_humans_adjudicating_both_fields_and_agreeing_is_measured() -> None:
+    measurement = measure(
+        field_review("reviewer-a", supported=False, critical=True),
+        field_review("reviewer-b", supported=False, critical=True),
+    )
+
+    assert measurement.measured is True
+    assert measurement.count == 1
+    assert measurement.gate_eligible is True
+
+
+@pytest.mark.parametrize(
+    "second",
+    [
+        {"supported": True, "critical": True},  # disagree on support
+        {"supported": False, "critical": False},  # disagree on criticality
+    ],
+)
+def test_two_humans_disagreeing_on_either_field_is_unmeasured(
+    second: dict[str, bool],
+) -> None:
+    measurement = measure(
+        field_review("reviewer-a", supported=False, critical=True),
+        field_review("reviewer-b", **second),  # type: ignore[arg-type]
+    )
+
+    assert measurement.measured is False
+
+
+def test_two_authored_reviewers_compute_but_never_reach_quorum() -> None:
+    """Authored labels exist to test the scorer, and say so in the provenance."""
+    measurement = measure(
+        field_review("authored-a", supported=False, critical=True, kind="authored"),
+        field_review("authored-b", supported=False, critical=True, kind="authored"),
+    )
+
+    assert measurement.measured is True
+    assert measurement.count == 1
+    assert measurement.provenance == "authored"
+    assert measurement.gate_eligible is False
+
+
+def test_transcript_reviewer_quorum_is_not_field_level_quorum() -> None:
+    """The invariant, stated directly so it cannot regress quietly."""
+    panel = panel_of(
+        field_review("reviewer-a", supported=False, critical=True),
+        field_review("reviewer-b", supported=None, critical=None),
+    )
+
+    # Two distinct human reviewers filed on this transcript.
+    assert panel.has_quorum("t") is True
+    assert panel.reviewer_count("t") == 2
+
+    # ...and neither field on this claim reached two adjudicating humans.
+    support = panel.claim_support("t", 0)
+    criticality = panel.claim_criticality("t", 0)
+    assert support.settled is True and criticality.settled is True
+    assert support.human_reviewers == 1
+    assert support.human_quorum is False
+    assert criticality.human_quorum is False
+
+
+def test_an_authored_opinion_never_counts_toward_human_quorum() -> None:
+    panel = panel_of(
+        field_review("reviewer-a", supported=False, critical=True),
+        field_review("authored-b", supported=False, critical=True, kind="authored"),
+    )
+
+    verdict = panel.claim_support("t", 0)
+
+    assert verdict.reviewers == 2
+    assert verdict.human_reviewers == 1
+    assert verdict.human_quorum is False
+
+
+def test_duplicate_reviewer_protection_still_holds(tmp_path: Path) -> None:
+    """Unchanged by the field-level work."""
+    for name in ("first", "second"):
+        (tmp_path / f"t.{name}.json").write_text(
+            json.dumps(
+                {
+                    "transcript_id": "t",
+                    "reviewer": "reviewer-a",
+                    "kind": "human",
+                    "judgements": [
+                        {"claim_index": 0, "semantically_supported": False, "critical": True}
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+    with pytest.raises(AdjudicationError, match="twice"):
+        load_panel(tmp_path)
