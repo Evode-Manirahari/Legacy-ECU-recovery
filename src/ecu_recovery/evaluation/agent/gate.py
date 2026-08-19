@@ -13,10 +13,11 @@ is a lexical proxy that would not deserve one even if the numbers looked good.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 
 from ..models import GateCheck
-from .models import AgentMetrics
+from .models import AgentMetrics, Measurement
 
 GATE_TARGETS: tuple[tuple[str, str, float], ...] = (
     ("evidence_reference_validity", "==", 100.0),
@@ -27,11 +28,20 @@ GATE_TARGETS: tuple[tuple[str, str, float], ...] = (
 )
 
 
+@dataclass(frozen=True)
 class AgentGateCheck(GateCheck):
-    """A gate check that also understands `<=`, which the static gate never needed."""
+    """A gate check understanding `<=`, and refusing to pass on an unmeasured metric."""
+
+    unmeasured: bool = False
+    unmeasured_reason: str = ""
 
     @property
     def passed(self) -> bool:
+        # An unmeasured metric fails. It has not met the threshold; nobody has
+        # checked, and a gate that green-lights on absence of evidence is not a
+        # gate.
+        if self.unmeasured:
+            return False
         value = self.observed_value
         if value is None:
             return False
@@ -43,6 +53,17 @@ class AgentGateCheck(GateCheck):
         suffix = "" if self.observed_count is not None else "%"
         return f"{self.comparison} {self.threshold:g}{suffix}"
 
+    def render_observed(self) -> str:
+        if self.unmeasured:
+            return "UNMEASURED"
+        return super().render_observed()
+
+    def as_dict(self) -> dict[str, Any]:
+        payload = super().as_dict()
+        payload["unmeasured"] = self.unmeasured
+        payload["unmeasured_reason"] = self.unmeasured_reason
+        return payload
+
 
 def check_gate(metrics: AgentMetrics) -> tuple[AgentGateCheck, ...]:
     ratios: dict[str, Any] = {
@@ -50,12 +71,25 @@ def check_gate(metrics: AgentMetrics) -> tuple[AgentGateCheck, ...]:
         "schema_compliance": metrics.schema_compliance,
         "unsupported_factual_claims": metrics.unsupported_factual_claims,
     }
-    counts = {
-        "tool_hallucinations": metrics.tool_hallucinations,
+    measurements: dict[str, Measurement] = {
         "critical_unsupported_claims": metrics.critical_unsupported_claims,
     }
+    counts = {"tool_hallucinations": metrics.tool_hallucinations}
     checks: list[AgentGateCheck] = []
     for metric, comparison, threshold in GATE_TARGETS:
+        if metric in measurements:
+            measurement = measurements[metric]
+            checks.append(
+                AgentGateCheck(
+                    metric=metric,
+                    comparison=comparison,
+                    threshold=threshold,
+                    observed_count=measurement.count,
+                    unmeasured=not measurement.measured,
+                    unmeasured_reason=measurement.reason,
+                )
+            )
+            continue
         if metric in counts:
             checks.append(
                 AgentGateCheck(

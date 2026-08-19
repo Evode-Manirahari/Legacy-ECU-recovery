@@ -29,12 +29,29 @@ from ecu_recovery.evaluation.agent import (
     render_report,
     score_transcript,
 )
+from ecu_recovery.evaluation.agent.models import Measurement
 from ecu_recovery.evaluation.models import Ratio
 
 TRANSCRIPTS = Path(__file__).resolve().parent / "transcripts"
 ARTIFACTS = Path(__file__).resolve().parents[3] / "artifacts" / "evals" / "agent"
 RESULTS = ARTIFACTS / "agent-results.json"
 REPORT = ARTIFACTS / "agent-report.md"
+
+
+def clean_metrics(
+    unsupported: Ratio | None = None, critical: Measurement | None = None
+) -> AgentMetrics:
+    """A metrics object that passes everything, for testing one knob at a time."""
+    return AgentMetrics(
+        evidence_reference_validity=Ratio(10, 10),
+        schema_compliance=Ratio(4, 4),
+        unsupported_factual_claims=unsupported or Ratio(0, 8),
+        tool_hallucinations=0,
+        critical_unsupported_claims=critical or Measurement("c", count=0),
+        classification_accuracy=Measurement.unmeasured("classification_accuracy", "no reviewer"),
+        confidence_calibration=Measurement.unmeasured("confidence_calibration", "no reviewer"),
+        classification_term_recall_diagnostic=Ratio(3, 9),
+    )
 
 
 def by_id(transcript_id: str) -> Transcript:
@@ -80,7 +97,6 @@ def test_a_clean_transcript_scores_clean() -> None:
     assert score.parsed is True
     assert score.fabricated_citations == 0
     assert score.unsupported_factual_claims == 0
-    assert score.critical_unsupported_claims == 0
     assert score.valid_citations == score.citations
 
 
@@ -100,9 +116,17 @@ def test_one_valid_citation_does_not_excuse_a_fabricated_one() -> None:
 
 
 def test_an_uncited_factual_claim_is_counted_as_unsupported() -> None:
+    """Counted before demotion. The agent catching it is not the model not doing it.
+
+    Scoring survivors alone reported zero here, which read as "the model made no
+    unsupported claims" when it had made one and been caught.
+    """
     score = score_transcript(by_id("04-unsupported-assertion"))
 
     assert score.demotions == 1
+    assert score.unsupported_factual_claims == 1
+    assert score.raw_factual_claims == 1
+    assert score.factual_claims == 0
 
 
 def test_an_honest_unknown_carries_no_evidential_burden() -> None:
@@ -148,13 +172,15 @@ def test_a_fixture_claiming_a_defect_it_does_not_contain_is_caught() -> None:
     from ecu_recovery.evaluation.agent.scoring import verify_detection
 
     transcript = by_id("01-supported")
+    # A complete vector with exactly one field wrong, so the mismatch reported
+    # is the disagreement itself rather than the incompleteness.
     lying = Transcript(
         id=transcript.id,
         sample_id=transcript.sample_id,
         subject=transcript.subject,
         scenario=transcript.scenario,
         investigation=transcript.investigation,
-        expects={"fabricated_citations": 3},
+        expects={**transcript.expects, "fabricated_citations": 3},
     )
 
     mismatches = verify_detection(lying, score_transcript(lying))
@@ -193,35 +219,14 @@ def test_the_gate_fails_over_the_adversarial_corpus_as_expected() -> None:
 
 def test_a_clean_corpus_would_pass_the_gate() -> None:
     """Proves the gate is satisfiable, not merely strict."""
-    metrics = AgentMetrics(
-        evidence_reference_validity=Ratio(10, 10),
-        schema_compliance=Ratio(4, 4),
-        unsupported_factual_claims=Ratio(0, 8),
-        tool_hallucinations=0,
-        critical_unsupported_claims=0,
-        classification_term_recall=Ratio(3, 9),
-    )
+    metrics = clean_metrics(unsupported=Ratio(0, 8), critical=Measurement("c", count=0))
 
     assert all(check.passed for check in check_gate(metrics))
 
 
 def test_the_unsupported_threshold_is_a_ceiling_not_an_equality() -> None:
-    under = AgentMetrics(
-        evidence_reference_validity=Ratio(10, 10),
-        schema_compliance=Ratio(4, 4),
-        unsupported_factual_claims=Ratio(1, 100),
-        tool_hallucinations=0,
-        critical_unsupported_claims=0,
-        classification_term_recall=Ratio(0, 0),
-    )
-    over = AgentMetrics(
-        evidence_reference_validity=Ratio(10, 10),
-        schema_compliance=Ratio(4, 4),
-        unsupported_factual_claims=Ratio(10, 100),
-        tool_hallucinations=0,
-        critical_unsupported_claims=0,
-        classification_term_recall=Ratio(0, 0),
-    )
+    under = clean_metrics(unsupported=Ratio(1, 100), critical=Measurement("c", count=0))
+    over = clean_metrics(unsupported=Ratio(10, 100), critical=Measurement("c", count=0))
 
     assert all(check.passed for check in check_gate(under))
     assert not all(check.passed for check in check_gate(over))
@@ -296,3 +301,165 @@ def test_the_artifacts_carry_no_environment_noise() -> None:
 
     assert "/Users/" not in text
     assert "/home/" not in text
+
+
+# --- review findings ---
+
+
+def test_unsupported_claims_are_counted_before_demotion() -> None:
+    """The whole corpus, end to end: overreach must not vanish into a demotion."""
+    run = evaluate(TRANSCRIPTS)
+
+    unsupported = run.metrics.unsupported_factual_claims
+
+    assert unsupported.numerator == 3, "02, 03 and 04 each plant one unsupported claim"
+    assert unsupported.denominator == 8
+    assert unsupported.rate is not None and unsupported.rate > 0.0
+
+
+def test_a_corpus_of_uncited_assertions_does_not_report_zero_unsupported(
+    tmp_path: Path,
+) -> None:
+    """The regression the review asked for, stated as a corpus rather than a case.
+
+    Every transcript here is a factual claim with no citation. AGENT-001 demotes
+    all of them, so a scorer looking only at survivors would report 0% - a
+    perfect score for a model that asserted things it could not support.
+    """
+    directory = tmp_path / "transcripts"
+    directory.mkdir()
+    source = by_id("04-unsupported-assertion")
+    for index in range(4):
+        payload = source.as_dict()
+        payload["id"] = f"gen-{index:02d}"
+        directory.joinpath(f"gen-{index:02d}.json").write_text(
+            json.dumps(payload), encoding="utf-8"
+        )
+
+    run = evaluate(directory, adjudications_dir=tmp_path / "none")
+
+    assert run.metrics.unsupported_factual_claims == Ratio(4, 4)
+    assert run.metrics.unsupported_factual_claims.percent == 100.0
+    assert not any(
+        check.passed for check in run.gate if check.metric == "unsupported_factual_claims"
+    )
+
+
+def test_detector_verification_catches_a_defect_nobody_planted() -> None:
+    """False positives, not just false negatives.
+
+    The fixture declares a clean vector; the scorer is handed a transcript that
+    is not clean. Comparing only declared fields would have agreed with it.
+    """
+    from ecu_recovery.evaluation.agent.scoring import verify_detection
+
+    dirty = by_id("02-fabricated-citation")
+    clean_expectation = dict(by_id("01-supported").expects)
+    mislabelled = Transcript(
+        id=dirty.id,
+        sample_id=dirty.sample_id,
+        subject=dirty.subject,
+        scenario=dirty.scenario,
+        investigation=dirty.investigation,
+        expects=clean_expectation,
+    )
+
+    mismatches = verify_detection(mislabelled, score_transcript(mislabelled))
+
+    assert mismatches
+    assert any("fabricated_citations" in item for item in mismatches)
+
+
+def test_an_incomplete_fixture_expectation_is_itself_a_failure() -> None:
+    """A partial vector hides false positives in the fields it omits."""
+    from ecu_recovery.evaluation.agent.scoring import verify_detection
+
+    source = by_id("01-supported")
+    partial = Transcript(
+        id=source.id,
+        sample_id=source.sample_id,
+        subject=source.subject,
+        scenario=source.scenario,
+        investigation=source.investigation,
+        expects={"parsed": True},
+    )
+
+    mismatches = verify_detection(partial, score_transcript(partial))
+
+    assert mismatches
+    assert any("declares no expectation" in item for item in mismatches)
+
+
+def test_classification_accuracy_is_unmeasured_without_a_reviewer(tmp_path: Path) -> None:
+    run = evaluate(TRANSCRIPTS, adjudications_dir=tmp_path / "absent")
+
+    accuracy = run.metrics.classification_accuracy
+
+    assert accuracy.measured is False
+    assert accuracy.render() == "UNMEASURED"
+    assert "blinded" in accuracy.reason
+
+
+def test_confidence_calibration_is_unmeasured_without_semantic_labels(
+    tmp_path: Path,
+) -> None:
+    """Citations resolving is not correctness; 07 is the proof."""
+    run = evaluate(TRANSCRIPTS, adjudications_dir=tmp_path / "absent")
+
+    assert run.metrics.confidence_calibration.measured is False
+    # The citation-based buckets remain, under a name that says what they are.
+    assert run.metrics.citation_support_calibration
+
+
+def test_a_well_cited_wrong_claim_is_not_counted_as_supported() -> None:
+    """07 resolves every citation and is wrong. Only adjudication can say so."""
+    score = score_transcript(by_id("07-wrong-classification"))
+
+    assert score.valid_citations == score.citations == 1
+    assert score.unsupported_factual_claims == 0
+
+    run = evaluate(TRANSCRIPTS)
+
+    assert run.metrics.confidence_calibration.measured is True
+    assert run.metrics.classification_accuracy.ratio is not None
+    assert run.metrics.classification_accuracy.ratio.numerator < (
+        run.metrics.classification_accuracy.ratio.denominator
+    )
+
+
+def test_critical_unsupported_claims_is_unmeasured_without_adjudication(
+    tmp_path: Path,
+) -> None:
+    """A zero nobody assessed would be the most dangerous line in the file."""
+    run = evaluate(TRANSCRIPTS, adjudications_dir=tmp_path / "absent")
+
+    assert run.metrics.critical_unsupported_claims.measured is False
+
+
+def test_an_unmeasured_metric_can_never_satisfy_the_gate() -> None:
+    metrics = clean_metrics(
+        critical=Measurement.unmeasured("critical_unsupported_claims", "no reviewer")
+    )
+
+    checks = {check.metric: check for check in check_gate(metrics)}
+
+    assert checks["critical_unsupported_claims"].passed is False
+    assert checks["critical_unsupported_claims"].render_observed() == "UNMEASURED"
+
+
+def test_adjudication_never_modifies_the_frozen_transcript() -> None:
+    """Judgement arrives beside the transcript, never inside it."""
+    transcript = by_id("07-wrong-classification")
+
+    assert "adjudication" not in transcript.investigation
+    assert "semantically_supported" not in json.dumps(transcript.investigation)
+    assert (TRANSCRIPTS.parent / "adjudications" / "07-wrong-classification.json").is_file()
+
+
+def test_authored_adjudication_keeps_the_run_baseline_only() -> None:
+    """A label written to test the scorer is not a reviewer's verdict."""
+    run = evaluate(TRANSCRIPTS)
+
+    assert run.adjudicators == ("authored",)
+    assert run.baseline_only is True
+    assert run.as_dict()["sufficient_for_gate_agent_mvp"] is False

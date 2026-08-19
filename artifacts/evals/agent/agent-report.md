@@ -33,6 +33,7 @@ scorer while re-running the agent measures the agent.
 - transcripts scored: 8
 - adversarial corpus: True
 - detector verification: PASS
+- adjudicators: authored
 - results schema: 1
 
 ## Gated metrics
@@ -44,29 +45,41 @@ expected to fail; they are not a verdict on an agent.
 |---|---|---|---|
 | evidence_reference_validity | == 100% | 77.7778% (7/9) | FAIL |
 | schema_compliance | == 100% | 87.5% (7/8) | FAIL |
-| unsupported_factual_claims | <= 5% | 0.0% (0/5) | PASS |
+| unsupported_factual_claims | <= 5% | 37.5% (3/8) | FAIL |
 | tool_hallucinations | == 0 | 2 | FAIL |
-| critical_unsupported_claims | == 0 | 0 | PASS |
+| critical_unsupported_claims | == 0 | 2 | FAIL |
 
 Four of these are gated at a perfect score because they measure the
 checking, not the reasoning. A fabricated citation reaching a surviving
 claim is a failure of the mechanism, and there is no acceptable rate for it.
 
-## Baseline only — not gated
+## Not measured
 
-- classification term recall: 8.9286% (5/56)
+These need semantic adjudication. None is reported as a number until a
+reviewer supplies one, because a metric nobody computed must not read like
+a metric that came out well.
 
-This is a lexical proxy: how many significant terms from the ground-truth
-role description appear anywhere in the agent's claims. It is not semantic
-judgement, which `EVALS.md` reserves for two blinded human reviewers. It is
-published because an unmeasured number invites someone to assume one.
+| Metric | State | Why |
+|---|---|---|
+| classification_accuracy | 42.8571% (3/7) |  |
+| confidence_calibration | 57.1429% (4/7) | calibration against adjudicated semantic support |
+| critical_unsupported_claims | 2 |  |
 
-## Confidence calibration
+## Diagnostics — not the metrics above
 
-Stated confidence against observed support, where support means every
-citation on the claim resolved. A positive gap is overconfidence.
+- `classification_term_recall_diagnostic`: 8.9286% (5/56)
 
-| Confidence | Claims | Supported | Observed | Gap |
+Term overlap between the agent's sentences and the ground-truth role. It
+measures vocabulary, not whether the role was identified, and it is named
+so it cannot be mistaken for classification accuracy.
+
+## Citation-support calibration
+
+Stated confidence against **citation resolution**, which is not semantic
+correctness: `07-wrong-classification` resolves every citation and is wrong
+on purpose. Real confidence calibration stays unmeasured above.
+
+| Confidence | Claims | Citations held | Observed | Gap |
 |---|---:|---:|---|---:|
 | 0.00–0.25 | 1 | 1 | 100.0% (1/1) | -0.875 |
 | 0.50–0.75 | 1 | 1 | 100.0% (1/1) | -0.375 |
@@ -77,9 +90,9 @@ citation on the claim resolved. A positive gap is overconfidence.
 | Transcript | Scenario | Parsed | Claims | Citations valid | Fabricated | Unsupported | Demoted |
 |---|---|---|---:|---|---:|---:|---:|
 | `01-supported` | every factual claim carries citations that all resolve | PASS | 2 | 3/3 | 0 | 0 | 0 |
-| `02-fabricated-citation` | a claim citing a fact that was never gathered | PASS | 1 | 0/1 | 1 | 0 | 1 |
-| `03-mixed-citations` | one resolving citation beside one fabricated citation | PASS | 1 | 1/2 | 1 | 0 | 1 |
-| `04-unsupported-assertion` | a factual claim carrying no citation at all | PASS | 1 | 0/0 | 0 | 0 | 1 |
+| `02-fabricated-citation` | a claim citing a fact that was never gathered | PASS | 1 | 0/1 | 1 | 1 | 1 |
+| `03-mixed-citations` | one resolving citation beside one fabricated citation | PASS | 1 | 1/2 | 1 | 1 | 1 |
+| `04-unsupported-assertion` | a factual claim carrying no citation at all | PASS | 1 | 0/0 | 0 | 1 | 1 |
 | `05-honest-unknown` | the agent declining to answer, correctly | PASS | 1 | 0/0 | 0 | 0 | 0 |
 | `06-malformed-reply` | a reply that is not usable JSON | FAIL | 0 | 0/0 | 0 | 0 | 0 |
 | `07-wrong-classification` | well-cited claims describing the wrong role | PASS | 1 | 1/1 | 0 | 0 | 0 |

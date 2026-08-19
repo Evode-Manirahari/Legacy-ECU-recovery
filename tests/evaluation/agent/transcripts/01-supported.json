@@ -1,9 +1,14 @@
 {
   "expects": {
+    "citations": 3,
     "claims": 2,
     "demotions": 0,
     "fabricated_citations": 0,
-    "parsed": true
+    "factual_claims": 2,
+    "parsed": true,
+    "raw_factual_claims": 2,
+    "unsupported_factual_claims": 0,
+    "valid_citations": 3
   },
   "id": "01-supported",
   "investigation": {

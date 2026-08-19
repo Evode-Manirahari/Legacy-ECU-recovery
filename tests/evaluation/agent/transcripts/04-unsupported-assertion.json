@@ -1,8 +1,14 @@
 {
   "expects": {
+    "citations": 0,
+    "claims": 1,
     "demotions": 1,
     "fabricated_citations": 0,
-    "parsed": true
+    "factual_claims": 0,
+    "parsed": true,
+    "raw_factual_claims": 1,
+    "unsupported_factual_claims": 1,
+    "valid_citations": 0
   },
   "id": "04-unsupported-assertion",
   "investigation": {

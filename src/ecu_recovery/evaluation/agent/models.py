@@ -16,7 +16,7 @@ the model being wrong, it is the checking having failed.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, ClassVar
 
 from ..models import Ratio, total
 
@@ -28,14 +28,87 @@ FACTUAL_SUPPORT = ("observed", "inferred")
 
 
 @dataclass(frozen=True)
+class Measurement:
+    """A metric, or an honest statement that nobody has measured it.
+
+    Unmeasured is not zero and not a pass. A metric that needs semantic
+    judgement and has not received any reports itself as unmeasured, carries the
+    reason, and cannot satisfy a gate: a green line nobody computed is worse
+    than a red one, because it stops anyone looking.
+    """
+
+    name: str
+    ratio: Ratio | None = None
+    count: int | None = None
+    measured: bool = True
+    reason: str = ""
+
+    @classmethod
+    def unmeasured(cls, name: str, reason: str) -> Measurement:
+        return cls(name=name, measured=False, reason=reason)
+
+    def render(self) -> str:
+        if not self.measured:
+            return "UNMEASURED"
+        if self.count is not None:
+            return str(self.count)
+        return "n/a" if self.ratio is None else self.ratio.render()
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "measured": self.measured,
+            "reason": self.reason,
+            "ratio": None if self.ratio is None else self.ratio.as_dict(),
+            "count": self.count,
+        }
+
+
+@dataclass(frozen=True)
+class DetectorVector:
+    """Every field the scorer can report about one transcript.
+
+    Complete on purpose. Comparing only the fields a fixture happened to mention
+    would catch a missed defect but never an invented one, and "no false
+    positives" is half of what a detector has to prove.
+    """
+
+    parsed: bool
+    claims: int
+    factual_claims: int
+    raw_factual_claims: int
+    citations: int
+    valid_citations: int
+    fabricated_citations: int
+    unsupported_factual_claims: int
+    demotions: int
+
+    FIELDS: ClassVar[tuple[str, ...]] = (
+        "parsed",
+        "claims",
+        "factual_claims",
+        "raw_factual_claims",
+        "citations",
+        "valid_citations",
+        "fabricated_citations",
+        "unsupported_factual_claims",
+        "demotions",
+    )
+
+    def as_dict(self) -> dict[str, Any]:
+        return {name: getattr(self, name) for name in self.FIELDS}
+
+
+@dataclass(frozen=True)
 class ClassificationScore:
     """A lexical proxy for whether a claim describes the right role.
 
-    Deliberately crude, and published as a baseline rather than a gate. EVALS.md
-    reserves semantic classification for two blinded human reviewers, and a term
-    overlap is not that. It is reported because an unmeasured number invites
-    someone to assume it, and because a proxy whose definition is stated can at
-    least be argued with.
+    A **diagnostic**, not classification accuracy. Term overlap between a
+    sentence a model wrote and a sentence a fixture author wrote says something
+    about vocabulary and nothing about whether the model identified the right
+    role. EVALS.md reserves that judgement for two blinded reviewers, so
+    classification accuracy is reported as unmeasured until one exists, and this
+    is published beside it under a name that cannot be mistaken for it.
     """
 
     subject: str
@@ -104,10 +177,24 @@ class TranscriptScore:
     valid_citations: int
     fabricated_citations: int
     unsupported_factual_claims: int
-    critical_unsupported_claims: int
+    raw_factual_claims: int
     demotions: int
     classification: ClassificationScore | None = None
     notes: tuple[str, ...] = ()
+
+    @property
+    def detector(self) -> DetectorVector:
+        return DetectorVector(
+            parsed=self.parsed,
+            claims=self.claims,
+            factual_claims=self.factual_claims,
+            raw_factual_claims=self.raw_factual_claims,
+            citations=self.citations,
+            valid_citations=self.valid_citations,
+            fabricated_citations=self.fabricated_citations,
+            unsupported_factual_claims=self.unsupported_factual_claims,
+            demotions=self.demotions,
+        )
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -122,7 +209,7 @@ class TranscriptScore:
             "valid_citations": self.valid_citations,
             "fabricated_citations": self.fabricated_citations,
             "unsupported_factual_claims": self.unsupported_factual_claims,
-            "critical_unsupported_claims": self.critical_unsupported_claims,
+            "raw_factual_claims": self.raw_factual_claims,
             "demotions": self.demotions,
             "classification": None
             if self.classification is None
@@ -135,11 +222,15 @@ class TranscriptScore:
 class AgentMetrics:
     evidence_reference_validity: Ratio
     schema_compliance: Ratio
+    #: Model overreach, counted before AGENT-001 demoted it. A claim the agent
+    #: caught is still a claim the model made.
     unsupported_factual_claims: Ratio
     tool_hallucinations: int
-    critical_unsupported_claims: int
-    classification_term_recall: Ratio
-    confidence_buckets: tuple[ConfidenceBucket, ...] = ()
+    critical_unsupported_claims: Measurement
+    classification_accuracy: Measurement
+    confidence_calibration: Measurement
+    classification_term_recall_diagnostic: Ratio
+    citation_support_calibration: tuple[ConfidenceBucket, ...] = ()
     transcripts: int = 0
     demotions: int = 0
 
@@ -148,12 +239,18 @@ class AgentMetrics:
             "transcripts": self.transcripts,
             "evidence_reference_validity": self.evidence_reference_validity.as_dict(),
             "schema_compliance": self.schema_compliance.as_dict(),
-            "unsupported_factual_claims": self.unsupported_factual_claims.as_dict(),
+            "unsupported_factual_claims_raw": self.unsupported_factual_claims.as_dict(),
             "tool_hallucinations": self.tool_hallucinations,
-            "critical_unsupported_claims": self.critical_unsupported_claims,
+            "critical_unsupported_claims": self.critical_unsupported_claims.as_dict(),
             "demotions": self.demotions,
-            "classification_term_recall_baseline": self.classification_term_recall.as_dict(),
-            "confidence_calibration": [item.as_dict() for item in self.confidence_buckets],
+            "classification_accuracy": self.classification_accuracy.as_dict(),
+            "classification_term_recall_diagnostic": (
+                self.classification_term_recall_diagnostic.as_dict()
+            ),
+            "confidence_calibration": self.confidence_calibration.as_dict(),
+            "citation_support_calibration": [
+                item.as_dict() for item in self.citation_support_calibration
+            ],
         }
 
 
@@ -188,6 +285,9 @@ class AgentEvaluationRun:
     #: True when the corpus deliberately contains defects, in which case gate
     #: failure is the expected outcome and says nothing about the agent.
     adversarial: bool = False
+    #: Who supplied the post-freeze judgements, if anyone. Authored labels
+    #: verify that the scorer computes adjudicated metrics; they are not review.
+    adjudicators: tuple[str, ...] = ()
 
     @property
     def gate_passed(self) -> bool:
@@ -200,14 +300,23 @@ class AgentEvaluationRun:
 
     @property
     def baseline_only(self) -> bool:
-        """True when nothing here may be used to pass GATE-AGENT-MVP."""
-        return not self.provenance.is_real_model
+        """True when nothing here may be used to pass GATE-AGENT-MVP.
+
+        Authored adjudication counts as authored, exactly like an authored
+        transcript. A label written to test the scorer is not a reviewer's
+        verdict, and treating it as one would let the evaluator grade its own
+        homework.
+        """
+        return not self.provenance.is_real_model or any(
+            item != "human" for item in self.adjudicators
+        )
 
     def as_dict(self) -> dict[str, Any]:
         return {
             "schema_version": SCHEMA_VERSION,
             "provenance": self.provenance.as_dict(),
             "adversarial_corpus": self.adversarial,
+            "adjudicators": list(self.adjudicators),
             "detection_verified": self.detection_verified,
             "detection_mismatches": list(self.detection_mismatches),
             "gate_would_pass": self.gate_passed,

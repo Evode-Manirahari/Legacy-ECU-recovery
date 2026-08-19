@@ -30,29 +30,174 @@ from ecu_recovery.agent.provider import ModelRequest, ModelResponse  # noqa: E40
 from ecu_recovery.analysis.ghidra import GhidraEngine  # noqa: E402
 from ecu_recovery.tools import ToolContext  # noqa: E402
 
-#: What each fixture deliberately plants. Declared separately and by name so the
-#: scorer can be held to it: a detector that is only ever shown clean input has
-#: not been tested, and one that reports a defect nobody planted is worse.
+#: The complete detector vector each fixture expects. Complete on purpose:
+#: comparing only the fields a fixture chose to mention would catch a missed
+#: defect and never an invented one, and "no false positives" is half of what a
+#: detector has to prove.
+#:
+#: The defect-relevant entries are reasoned, not copied. 04 carries a factual
+#: claim with no citation, so it must score one unsupported claim even though
+#: AGENT-001 demoted it - the agent catching an overreach is not the model
+#: declining to make one. 07 is well-cited and wrong, so it scores zero
+#: unsupported: its wrongness is semantic and stays unmeasured.
 EXPECTS: dict[str, dict[str, object]] = {
-    "01-supported": {"parsed": True, "fabricated_citations": 0, "demotions": 0, "claims": 2},
-    "02-fabricated-citation": {"parsed": True, "fabricated_citations": 1, "demotions": 1},
-    "03-mixed-citations": {"parsed": True, "fabricated_citations": 1, "demotions": 1},
-    "04-unsupported-assertion": {"parsed": True, "fabricated_citations": 0, "demotions": 1},
-    "05-honest-unknown": {"parsed": True, "fabricated_citations": 0, "demotions": 0, "claims": 1},
-    "06-malformed-reply": {"parsed": False, "claims": 0},
-    "07-wrong-classification": {"parsed": True, "fabricated_citations": 0, "demotions": 0},
+    "01-supported": {
+        "parsed": True,
+        "claims": 2,
+        "factual_claims": 2,
+        "raw_factual_claims": 2,
+        "citations": 3,
+        "valid_citations": 3,
+        "fabricated_citations": 0,
+        "unsupported_factual_claims": 0,
+        "demotions": 0,
+    },
+    "02-fabricated-citation": {
+        "parsed": True,
+        "claims": 1,
+        "factual_claims": 0,
+        "raw_factual_claims": 1,
+        "citations": 1,
+        "valid_citations": 0,
+        "fabricated_citations": 1,
+        "unsupported_factual_claims": 1,
+        "demotions": 1,
+    },
+    "03-mixed-citations": {
+        "parsed": True,
+        "claims": 1,
+        "factual_claims": 0,
+        "raw_factual_claims": 1,
+        "citations": 2,
+        "valid_citations": 1,
+        "fabricated_citations": 1,
+        "unsupported_factual_claims": 1,
+        "demotions": 1,
+    },
+    "04-unsupported-assertion": {
+        "parsed": True,
+        "claims": 1,
+        "factual_claims": 0,
+        "raw_factual_claims": 1,
+        "citations": 0,
+        "valid_citations": 0,
+        "fabricated_citations": 0,
+        "unsupported_factual_claims": 1,
+        "demotions": 1,
+    },
+    "05-honest-unknown": {
+        "parsed": True,
+        "claims": 1,
+        "factual_claims": 0,
+        "raw_factual_claims": 0,
+        "citations": 0,
+        "valid_citations": 0,
+        "fabricated_citations": 0,
+        "unsupported_factual_claims": 0,
+        "demotions": 0,
+    },
+    "06-malformed-reply": {
+        "parsed": False,
+        "claims": 0,
+        "factual_claims": 0,
+        "raw_factual_claims": 0,
+        "citations": 0,
+        "valid_citations": 0,
+        "fabricated_citations": 0,
+        "unsupported_factual_claims": 0,
+        "demotions": 0,
+    },
+    "07-wrong-classification": {
+        "parsed": True,
+        "claims": 1,
+        "factual_claims": 1,
+        "raw_factual_claims": 1,
+        "citations": 1,
+        "valid_citations": 1,
+        "fabricated_citations": 0,
+        "unsupported_factual_claims": 0,
+        "demotions": 0,
+    },
     "08-confidence-extremes": {
         "parsed": True,
-        "fabricated_citations": 0,
-        "demotions": 0,
         "claims": 2,
+        "factual_claims": 2,
+        "raw_factual_claims": 2,
+        "citations": 2,
+        "valid_citations": 2,
+        "fabricated_citations": 0,
+        "unsupported_factual_claims": 0,
+        "demotions": 0,
     },
 }
 
+#: Authored post-freeze judgements. These exist only to prove the evaluator
+#: computes adjudicated metrics correctly. They are labelled `authored`, which
+#: keeps the whole run baseline-only: a label written to test the scorer is not
+#: a reviewer's verdict, and treating it as one would be grading our own work.
+#:
+#: 07 is the interesting one. Every citation resolves and the claim is wrong, so
+#: it is semantically unsupported, classified incorrectly, and critical - the
+#: exact case that proves citation resolution is not semantic correctness.
+ADJUDICATIONS: dict[str, list[dict[str, object]]] = {
+    "01-supported": [
+        {
+            "claim_index": 0,
+            "semantically_supported": True,
+            "classification_correct": True,
+            "critical": False,
+        },
+        {
+            "claim_index": 1,
+            "semantically_supported": True,
+            "classification_correct": True,
+            "critical": False,
+        },
+    ],
+    "04-unsupported-assertion": [
+        {
+            "claim_index": 0,
+            "semantically_supported": False,
+            "classification_correct": False,
+            "critical": True,
+        },
+    ],
+    "05-honest-unknown": [
+        {
+            "claim_index": 0,
+            "semantically_supported": True,
+            "classification_correct": False,
+            "critical": False,
+        },
+    ],
+    "07-wrong-classification": [
+        {
+            "claim_index": 0,
+            "semantically_supported": False,
+            "classification_correct": False,
+            "critical": True,
+        },
+    ],
+    "08-confidence-extremes": [
+        {
+            "claim_index": 0,
+            "semantically_supported": True,
+            "classification_correct": True,
+            "critical": False,
+        },
+        {
+            "claim_index": 1,
+            "semantically_supported": False,
+            "classification_correct": False,
+            "critical": False,
+        },
+    ],
+}
 
 SAMPLE = "multi_function_pipeline_v1"
 FIRMWARE = ROOT / "samples" / "synthetic" / "binaries" / SAMPLE / "firmware.stripped"
 OUT = Path(__file__).resolve().parent / "transcripts"
+ADJ = Path(__file__).resolve().parent / "adjudications"
 
 
 class Scripted:
@@ -87,7 +232,8 @@ def symbols() -> dict[int, str]:
 
 def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
-    for stale in OUT.glob("*.json"):
+    ADJ.mkdir(parents=True, exist_ok=True)
+    for stale in [*OUT.glob("*.json"), *ADJ.glob("*.json")]:
         stale.unlink()
 
     names = symbols()
@@ -248,7 +394,23 @@ def main() -> int:
                 encoding="utf-8",
             )
             written += 1
+            judgements = ADJUDICATIONS.get(transcript_id)
+            if judgements is not None:
+                (ADJ / f"{transcript_id}.json").write_text(
+                    json.dumps(
+                        {
+                            "transcript_id": transcript_id,
+                            "adjudicator": "authored",
+                            "judgements": judgements,
+                        },
+                        indent=2,
+                        sort_keys=True,
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
     print(f"wrote {written} transcripts to {OUT}")
+    print(f"wrote {len(ADJUDICATIONS)} adjudications to {ADJ}")
     return 0
 
 

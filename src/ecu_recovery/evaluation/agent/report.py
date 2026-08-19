@@ -65,6 +65,7 @@ def render_report(run: AgentEvaluationRun) -> str:
         f"- transcripts scored: {metrics.transcripts}",
         f"- adversarial corpus: {run.adversarial}",
         f"- detector verification: {_status(run.detection_verified)}",
+        f"- adjudicators: {', '.join(run.adjudicators) or 'none'}",
         f"- results schema: {SCHEMA_VERSION}",
         "",
         "## Gated metrics",
@@ -89,33 +90,49 @@ def render_report(run: AgentEvaluationRun) -> str:
         "checking, not the reasoning. A fabricated citation reaching a surviving",
         "claim is a failure of the mechanism, and there is no acceptable rate for it.",
         "",
-        "## Baseline only — not gated",
+        "## Not measured",
         "",
-        f"- classification term recall: {metrics.classification_term_recall.render()}",
+        "These need semantic adjudication. None is reported as a number until a",
+        "reviewer supplies one, because a metric nobody computed must not read like",
+        "a metric that came out well.",
         "",
-        "This is a lexical proxy: how many significant terms from the ground-truth",
-        "role description appear anywhere in the agent's claims. It is not semantic",
-        "judgement, which `EVALS.md` reserves for two blinded human reviewers. It is",
-        "published because an unmeasured number invites someone to assume one.",
+        "| Metric | State | Why |",
+        "|---|---|---|",
+        f"| classification_accuracy | {metrics.classification_accuracy.render()} | "
+        f"{metrics.classification_accuracy.reason} |",
+        f"| confidence_calibration | {metrics.confidence_calibration.render()} | "
+        f"{metrics.confidence_calibration.reason} |",
+        f"| critical_unsupported_claims | {metrics.critical_unsupported_claims.render()} | "
+        f"{metrics.critical_unsupported_claims.reason} |",
         "",
-        "## Confidence calibration",
+        "## Diagnostics — not the metrics above",
+        "",
+        f"- `classification_term_recall_diagnostic`: "
+        f"{metrics.classification_term_recall_diagnostic.render()}",
+        "",
+        "Term overlap between the agent's sentences and the ground-truth role. It",
+        "measures vocabulary, not whether the role was identified, and it is named",
+        "so it cannot be mistaken for classification accuracy.",
+        "",
+        "## Citation-support calibration",
+        "",
+        "Stated confidence against **citation resolution**, which is not semantic",
+        "correctness: `07-wrong-classification` resolves every citation and is wrong",
+        "on purpose. Real confidence calibration stays unmeasured above.",
         "",
     ]
-    if metrics.confidence_buckets:
+    if metrics.citation_support_calibration:
         lines += [
-            "Stated confidence against observed support, where support means every",
-            "citation on the claim resolved. A positive gap is overconfidence.",
-            "",
-            "| Confidence | Claims | Supported | Observed | Gap |",
+            "| Confidence | Claims | Citations held | Observed | Gap |",
             "|---|---:|---:|---|---:|",
         ]
-        for bucket in metrics.confidence_buckets:
+        for bucket in metrics.citation_support_calibration:
             lines.append(
                 f"| {bucket.lower:.2f}–{bucket.upper:.2f} | {bucket.claims} | "
                 f"{bucket.supported} | {bucket.observed.render()} | {bucket.gap} |"
             )
     else:
-        lines.append("No factual claims carried confidence, so calibration is undefined here.")
+        lines.append("No factual claims carried confidence, so this is undefined here.")
 
     lines += [
         "",

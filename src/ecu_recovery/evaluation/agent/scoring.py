@@ -23,11 +23,14 @@ from typing import Any
 
 from ..groundtruth import DEFAULT_SAMPLES_ROOT
 from ..models import Ratio
+from .adjudication import Adjudication
 from .models import (
     FACTUAL_SUPPORT,
     AgentMetrics,
     ClassificationScore,
     ConfidenceBucket,
+    DetectorVector,
+    Measurement,
     TranscriptScore,
     pooled,
 )
@@ -94,34 +97,40 @@ def score_transcript(
     role_name: str | None = None,
     role_text: str | None = None,
 ) -> TranscriptScore:
-    """Score one transcript. Everything here is decidable, nothing is judged."""
+    """Score one transcript. Everything here is decidable; nothing is judged.
+
+    Unsupported factual claims are counted **before** demotion. AGENT-001
+    demotes a claim whose citations do not hold, which is the right behaviour
+    and would make this metric read zero if it only looked at survivors - the
+    agent catching an overreach is not the model declining to make one. Each
+    recorded demotion was a factual claim that failed evidential checking, so it
+    counts, and a survivor that is still unsupported counts too. The two sets
+    are disjoint: a demoted claim now carries `unknown`, so it is no longer
+    factual and cannot be counted twice.
+    """
     checks = transcript.checks
     claims = transcript.claims
-    factual = [claim for claim in claims if claim.get("support") in FACTUAL_SUPPORT]
+    surviving_factual = [claim for claim in claims if claim.get("support") in FACTUAL_SUPPORT]
 
     valid = sum(1 for item in checks if item.get("resolved"))
     fabricated = sum(1 for item in checks if item.get("fabricated"))
 
-    # A surviving factual claim that carries an unresolved citation, or none at
-    # all, is the failure the checking exists to prevent. AGENT-001 demotes
-    # these, so a non-zero count here means the mechanism did not hold - which
-    # is exactly why it is gated at zero rather than at "rare".
     by_fact_id = {item.get("fact_id"): item for item in checks}
-    critical = 0
-    unsupported = 0
-    for claim in factual:
+    still_unsupported = 0
+    for claim in surviving_factual:
         citations = list(claim.get("citations", []))
         if not citations:
-            unsupported += 1
-            critical += 1
+            still_unsupported += 1
             continue
-        resolved = [
+        if not all(
             by_fact_id.get(citation.get("fact_id"), {}).get("resolved", False)
             for citation in citations
-        ]
-        if not all(resolved):
-            unsupported += 1
-            critical += 1
+        ):
+            still_unsupported += 1
+
+    demoted = len(transcript.demotions)
+    unsupported = demoted + still_unsupported
+    raw_factual = len(surviving_factual) + demoted
 
     classification = None
     if role_name is not None and role_text is not None:
@@ -138,13 +147,13 @@ def score_transcript(
         scenario=transcript.scenario,
         parsed=transcript.parsed,
         claims=len(claims),
-        factual_claims=len(factual),
+        factual_claims=len(surviving_factual),
         citations=len(checks),
         valid_citations=valid,
         fabricated_citations=fabricated,
         unsupported_factual_claims=unsupported,
-        critical_unsupported_claims=critical,
-        demotions=len(transcript.demotions),
+        raw_factual_claims=raw_factual,
+        demotions=demoted,
         classification=classification,
         notes=tuple(notes),
     )
@@ -182,9 +191,109 @@ def confidence_buckets(transcripts: tuple[Transcript, ...]) -> tuple[ConfidenceB
     return tuple(buckets)
 
 
+_NO_ADJUDICATION = (
+    "semantic adjudication is required and none has been supplied; EVALS.md "
+    "reserves this judgement for blinded human reviewers"
+)
+
+
+def _adjudicated(
+    transcripts: tuple[Transcript, ...],
+    adjudications: dict[str, Adjudication],
+    field: str,
+) -> tuple[int, int]:
+    """Count (true, judged) for one adjudicated boolean across every claim."""
+    judged = 0
+    positive = 0
+    for transcript in transcripts:
+        adjudication = adjudications.get(transcript.id)
+        if adjudication is None:
+            continue
+        for index in range(len(transcript.claims)):
+            judgement = adjudication.for_claim(index)
+            if judgement is None:
+                continue
+            value = getattr(judgement, field)
+            if value is None:
+                continue
+            judged += 1
+            positive += 1 if value else 0
+    return positive, judged
+
+
+def classification_accuracy(
+    transcripts: tuple[Transcript, ...], adjudications: dict[str, Adjudication]
+) -> Measurement:
+    correct, judged = _adjudicated(transcripts, adjudications, "classification_correct")
+    if judged == 0:
+        return Measurement.unmeasured("classification_accuracy", _NO_ADJUDICATION)
+    return Measurement("classification_accuracy", ratio=Ratio(correct, judged))
+
+
+def confidence_calibration(
+    transcripts: tuple[Transcript, ...], adjudications: dict[str, Adjudication]
+) -> Measurement:
+    """Calibration against *semantic* correctness, not against citation resolution.
+
+    Citations resolving says the agent quoted a real tool result. It does not
+    say the claim built on it is true, which `07-wrong-classification` exists to
+    demonstrate: every citation holds and the claim is wrong. So this stays
+    unmeasured until semantic labels exist, and the citation-based buckets are
+    published beside it under a name that says what they are.
+    """
+    _, judged = _adjudicated(transcripts, adjudications, "semantically_supported")
+    if judged == 0:
+        return Measurement.unmeasured("confidence_calibration", _NO_ADJUDICATION)
+    correct_by_bucket: list[ConfidenceBucket] = []
+    for lower, upper in _BUCKETS:
+        claims = 0
+        supported = 0
+        for transcript in transcripts:
+            adjudication = adjudications.get(transcript.id)
+            if adjudication is None:
+                continue
+            for index, claim in enumerate(transcript.claims):
+                judgement = adjudication.for_claim(index)
+                if judgement is None or judgement.semantically_supported is None:
+                    continue
+                confidence = float(claim.get("confidence", 0.0))
+                inside = lower <= confidence < upper or (upper == 1.0 and confidence == 1.0)
+                if not inside:
+                    continue
+                claims += 1
+                supported += 1 if judgement.semantically_supported else 0
+        if claims:
+            correct_by_bucket.append(ConfidenceBucket(lower, upper, claims, supported))
+    total_claims = sum(item.claims for item in correct_by_bucket)
+    total_supported = sum(item.supported for item in correct_by_bucket)
+    return Measurement(
+        "confidence_calibration",
+        ratio=Ratio(total_supported, total_claims),
+        reason="calibration against adjudicated semantic support",
+    )
+
+
+def critical_unsupported_claims(
+    transcripts: tuple[Transcript, ...], adjudications: dict[str, Adjudication]
+) -> Measurement:
+    """Criticality is a judgement, so an unjudged corpus reports unmeasured.
+
+    Reporting zero here without adjudication would be the most dangerous number
+    in the file: a gate line reading "0 critical unsupported claims" that nobody
+    ever assessed.
+    """
+    critical, judged = _adjudicated(transcripts, adjudications, "critical")
+    if judged == 0:
+        return Measurement.unmeasured("critical_unsupported_claims", _NO_ADJUDICATION)
+    return Measurement("critical_unsupported_claims", count=critical)
+
+
 def aggregate(
-    transcripts: tuple[Transcript, ...], scores: tuple[TranscriptScore, ...]
+    transcripts: tuple[Transcript, ...],
+    scores: tuple[TranscriptScore, ...],
+    adjudications: dict[str, Adjudication] | None = None,
 ) -> AgentMetrics:
+    adjudications = adjudications or {}
     return AgentMetrics(
         evidence_reference_validity=Ratio(
             sum(item.valid_citations for item in scores),
@@ -193,42 +302,47 @@ def aggregate(
         schema_compliance=Ratio(sum(1 for item in scores if item.parsed), len(scores)),
         unsupported_factual_claims=Ratio(
             sum(item.unsupported_factual_claims for item in scores),
-            sum(item.factual_claims for item in scores),
+            sum(item.raw_factual_claims for item in scores),
         ),
         tool_hallucinations=sum(item.fabricated_citations for item in scores),
-        critical_unsupported_claims=sum(item.critical_unsupported_claims for item in scores),
-        classification_term_recall=pooled(
+        critical_unsupported_claims=critical_unsupported_claims(transcripts, adjudications),
+        classification_accuracy=classification_accuracy(transcripts, adjudications),
+        confidence_calibration=confidence_calibration(transcripts, adjudications),
+        classification_term_recall_diagnostic=pooled(
             [item.classification.recall for item in scores if item.classification is not None]
         ),
-        confidence_buckets=confidence_buckets(transcripts),
+        citation_support_calibration=confidence_buckets(transcripts),
         transcripts=len(scores),
         demotions=sum(item.demotions for item in scores),
     )
 
 
 def verify_detection(transcript: Transcript, score: TranscriptScore) -> tuple[str, ...]:
-    """Compare what a fixture planted against what the scorer found.
+    """Compare the complete detector vector against the complete expectation.
 
-    This is the check that makes an adversarial corpus worth having. A run over
-    such a corpus is *expected* to fail the gate - the defects are deliberate -
-    so gate failure says nothing about the scorer. What says something is
-    whether every planted defect was detected and no unplanted one was invented.
+    Complete on both sides, because comparing only the fields a fixture chose to
+    mention catches a missed defect and never an invented one. A fixture must
+    declare every field; an omission is a fixture bug and is reported as one,
+    not silently treated as agreement.
     """
-    observed = {
-        "parsed": score.parsed,
-        "fabricated_citations": score.fabricated_citations,
-        "unsupported_factual_claims": score.unsupported_factual_claims,
-        "critical_unsupported_claims": score.critical_unsupported_claims,
-        "demotions": score.demotions,
-        "claims": score.claims,
-    }
+    observed = score.detector.as_dict()
+    expected = dict(transcript.expects)
+    if not expected:
+        return (f"{transcript.id}: fixture declares no detector expectations",)
+
     mismatches: list[str] = []
-    for name, expected in transcript.expects.items():
-        if name not in observed:
-            mismatches.append(f"{transcript.id}: fixture expects unknown field {name!r}")
-            continue
-        if observed[name] != expected:
+    for name in sorted(set(expected) - set(observed)):
+        mismatches.append(f"{transcript.id}: fixture expects unknown field {name!r}")
+    for name in DetectorVector.FIELDS:
+        if name not in expected:
             mismatches.append(
-                f"{transcript.id}: expected {name}={expected!r}, scorer found {observed[name]!r}"
+                f"{transcript.id}: fixture declares no expectation for {name!r}; "
+                "the vector must be complete or a false positive there is invisible"
+            )
+            continue
+        if observed[name] != expected[name]:
+            mismatches.append(
+                f"{transcript.id}: expected {name}={expected[name]!r}, "
+                f"scorer found {observed[name]!r}"
             )
     return tuple(mismatches)

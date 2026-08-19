@@ -1,0 +1,18 @@
+{
+  "adjudicator": "authored",
+  "judgements": [
+    {
+      "claim_index": 0,
+      "classification_correct": true,
+      "critical": false,
+      "semantically_supported": true
+    },
+    {
+      "claim_index": 1,
+      "classification_correct": true,
+      "critical": false,
+      "semantically_supported": true
+    }
+  ],
+  "transcript_id": "01-supported"
+}

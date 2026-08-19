@@ -4,13 +4,18 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from .adjudication import load_adjudications
 from .gate import check_gate
 from .models import AgentEvaluationRun, Provenance, TranscriptScore
 from .scoring import aggregate, expected_roles, score_transcript, verify_detection
 from .transcripts import load_transcripts
 
 
-def evaluate(directory: Path, samples_root: Path | None = None) -> AgentEvaluationRun:
+def evaluate(
+    directory: Path,
+    samples_root: Path | None = None,
+    adjudications_dir: Path | None = None,
+) -> AgentEvaluationRun:
     """Score every transcript in `directory` against its sample's ground truth.
 
     Provenance is derived rather than asserted: a run counts as a real-model
@@ -20,6 +25,9 @@ def evaluate(directory: Path, samples_root: Path | None = None) -> AgentEvaluati
     quietly inflate a number presented as a model's.
     """
     transcripts = load_transcripts(directory)
+    if adjudications_dir is None:
+        adjudications_dir = directory.parent / "adjudications"
+    adjudications = load_adjudications(adjudications_dir)
     roles_by_sample: dict[str, dict[str, str]] = {}
     scores: list[TranscriptScore] = []
     for transcript in transcripts:
@@ -37,7 +45,7 @@ def evaluate(directory: Path, samples_root: Path | None = None) -> AgentEvaluati
         for transcript, score in zip(transcripts, scores, strict=True)
         for mismatch in verify_detection(transcript, score)
     )
-    metrics = aggregate(transcripts, tuple(scores))
+    metrics = aggregate(transcripts, tuple(scores), adjudications)
     kinds = {transcript.provenance for transcript in transcripts}
     real_model = kinds == {"model"}
     return AgentEvaluationRun(
@@ -54,4 +62,5 @@ def evaluate(directory: Path, samples_root: Path | None = None) -> AgentEvaluati
         gate=check_gate(metrics),
         detection_mismatches=detection_mismatches,
         adversarial=any(transcript.expects for transcript in transcripts),
+        adjudicators=tuple(sorted({item.adjudicator for item in adjudications.values()})),
     )

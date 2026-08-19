@@ -1,0 +1,12 @@
+{
+  "adjudicator": "authored",
+  "judgements": [
+    {
+      "claim_index": 0,
+      "classification_correct": false,
+      "critical": true,
+      "semantically_supported": false
+    }
+  ],
+  "transcript_id": "04-unsupported-assertion"
+}
