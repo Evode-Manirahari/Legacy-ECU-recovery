@@ -33,17 +33,21 @@ def canonical_digest(payload: Any) -> str:
     """A stable fingerprint of a tool result.
 
     Sorted keys and no incidental whitespace, so two runs that returned the same
-    data agree byte for byte regardless of dict ordering. Truncated to sixteen
-    hex characters: this identifies a result, it does not defend against an
-    adversary constructing a collision.
+    data agree byte for byte regardless of dict ordering.
+
+    The full SHA-256 is kept. Truncation was a readability choice, and it was
+    the wrong one: this digest decides whether a citation still reproduces its
+    fact, and a shortened hash trades collision resistance for nothing anyone
+    reads. Sixty-four characters cost only screen space in a field no human
+    parses.
     """
     rendered = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
-    return hashlib.sha256(rendered.encode("utf-8")).hexdigest()[:16]
+    return hashlib.sha256(rendered.encode("utf-8")).hexdigest()
 
 
-#: Persistent evidence keys are content-derived. Sixteen hex characters
-#: identifies a fact; it is not a defence against a constructed collision.
-EVIDENCE_KEY_LENGTH = 16
+#: Persistent evidence keys are content-derived and carry the full SHA-256.
+#: They are database identity for immutable observations, never something a
+#: person types, so there is nothing to trade collision resistance for.
 
 
 class SupportLevel(StrEnum):
@@ -97,7 +101,7 @@ class Fact:
             "summary": self.summary,
         }
         rendered = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
-        return "E-" + hashlib.sha256(rendered.encode("utf-8")).hexdigest()[:EVIDENCE_KEY_LENGTH]
+        return "E-" + hashlib.sha256(rendered.encode("utf-8")).hexdigest()
 
     def as_dict(self) -> dict[str, Any]:
         return {
