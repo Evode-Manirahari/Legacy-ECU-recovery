@@ -427,10 +427,94 @@ nodes:
     # Authored labels compute them to verify the scorer and are marked as such.
     note: Verified after PR #32; the evaluator is complete, a model baseline is not.
 
-  GATE-AGENT-MVP:
-    title: Agent MVP gate
+  PROVIDER-001:
+    title: OpenAI provider transport
+    # Transport only: ModelRequest in, ModelResponse out. It does not capture,
+    # freeze, or score anything - BASELINE-AGENT-001 owns transcript capture,
+    # and keeping the two apart means a transport failure and a bad answer are
+    # never the same incident.
     depends_on:
       - EVAL-AGENT-001
+    status: PENDING
+    worker: coding-agent
+    prompt: prompts/PROVIDER-001.md
+    # Its own tree, deliberately outside src/ecu_recovery/agent/**. AGENT-001
+    # owns the protocol and the bounded reasoning path and is already verified;
+    # a provider must not be able to reach into it. pyproject.toml is here for
+    # one line, the optional `openai` extra, so the default install and the
+    # whole suite stay free of it exactly as they are of Ghidra.
+    allowed_paths:
+      - src/ecu_recovery/providers/openai/**
+      - tests/providers/openai/**
+      - pyproject.toml
+    verification:
+      type: commands
+      commands:
+        - uv run pytest
+    retry_budget: 2
+    note: One completion request in, text out. No tools, no streaming, no storage.
+
+  BASELINE-AGENT-001:
+    title: First real-model baseline transcripts
+    # Experiment execution. Runs the existing agent over all eight fixtures with
+    # the OpenAI provider and freezes what comes back. It may not adjudicate its
+    # own output; that is REVIEW-AGENT-BASELINE-001, and the separation is what
+    # stops the thing being measured from grading itself.
+    depends_on:
+      - PROVIDER-001
+    status: PENDING
+    worker: coding-agent
+    prompt: prompts/BASELINE-AGENT-001.md
+    # Outside EVAL-AGENT-001's artifacts and tests, so a real baseline can never
+    # be confused with the authored fixtures that verify the scorer.
+    allowed_paths:
+      - artifacts/agent-baseline/transcripts/**
+      - artifacts/agent-baseline/results/**
+      - tests/agent_baseline/**
+    verification:
+      type: commands
+      commands:
+        - uv run pytest
+    retry_budget: 2
+    note: All eight fixtures. Commit the poor answers too; a curated baseline is none.
+
+  REVIEW-AGENT-BASELINE-001:
+    title: Blinded human review of the baseline
+    # The human gate the semantic metrics have been waiting for. Two distinct
+    # reviewers, submitting independently, without seeing each other's verdicts.
+    #
+    # `verification: human` is the graph's existing representation and its
+    # meaning is already recorded in graph/models.py: an agent must never
+    # self-approve one. A coding agent may prepare material for reviewers and
+    # may never file a review; if the two reviews do not exist this node reaches
+    # NEEDS_HUMAN, which is a real status in the state machine, rather than
+    # PASSED.
+    depends_on:
+      - BASELINE-AGENT-001
+    status: PENDING
+    worker: human-reviewers
+    prompt: prompts/REVIEW-AGENT-BASELINE-001.md
+    allowed_paths:
+      - artifacts/agent-baseline/reviews/**
+    verification:
+      type: human
+    retry_budget: 2
+    note: Two blinded reviewers. Authored labels never count; disagreement stays explicit.
+
+  GATE-AGENT-MVP:
+    title: Agent MVP gate
+    # REVIEW-AGENT-BASELINE-001 added 2026-08-19. Generating a real transcript
+    # is not the same as having it judged, and the gate needs both: the semantic
+    # metrics are unmeasured until two blinded reviewers reach field-level
+    # quorum. EVAL-AGENT-001 stays an explicit prerequisite because the gate
+    # certifies the measurement machinery as well as the measurement.
+    #
+    # Without this edge the gate could fire on the authored corpus and certify a
+    # measurement of nothing: every model reply there is scripted, and the
+    # evaluator reports sufficient_for_GATE-AGENT-MVP=False for that reason.
+    depends_on:
+      - EVAL-AGENT-001
+      - REVIEW-AGENT-BASELINE-001
     status: PENDING
     worker: verification
     prompt: prompts/GATE-AGENT-MVP.md

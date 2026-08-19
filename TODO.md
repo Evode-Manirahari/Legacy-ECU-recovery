@@ -32,7 +32,10 @@ uv run ecu-recovery graph ready
 | `GATE-STATIC-MVP` | PASSED | all twelve static MVP properties verified 2026-08-18 |
 | `AGENT-001` | PASSED | verified after PR #29; claims are checked against gathered facts |
 | `EVAL-AGENT-001` | PENDING | **READY** — no agent measurement exists |
-| `GATE-AGENT-MVP` | PENDING | **READY** — blocked in substance: no genuine model transcript |
+| `PROVIDER-001` | PENDING | **READY** — no OpenAI transport exists |
+| `BASELINE-AGENT-001` | PENDING | no real-model transcripts exist |
+| `REVIEW-AGENT-BASELINE-001` | PENDING | human gate; no blinded reviews exist |
+| `GATE-AGENT-MVP` | PENDING | waits on `REVIEW-AGENT-BASELINE-001` |
 
 Pre-graph code is *candidate implementation to verify and complete*, never
 already-completed graph work. See `ADR-002`.
@@ -61,32 +64,37 @@ SPEC-001 → REPO-001 → GRAPH-001 ─┬─→ DATA-001 ─→ GHIDRA-001 ─�
 scorer is verified against an adversarial corpus that plants each defect it
 claims to detect.
 
-`GATE-AGENT-MVP` is graph-ready and **cannot honestly pass**. Every transcript
-in the corpus carries a scripted model reply, so the gate would be certifying a
-measurement of nothing. The evaluator says so itself: the run reports
-`provenance=authored` and `sufficient_for_GATE-AGENT-MVP=False`.
-
-The next product boundary is therefore genuine model execution:
+`PROVIDER-001` is `READY`. Four nodes now stand between here and a gate that
+means something:
 
 ```text
-live provider -> frozen transcript -> existing deterministic evaluator
+PROVIDER-001  ->  BASELINE-AGENT-001  ->  REVIEW-AGENT-BASELINE-001  ->  GATE-AGENT-MVP
+  transport         experiment              human gate                    verification
 ```
 
-Nothing in the evaluator changes to consume a real transcript. What is missing
-is one adapter behind the existing `ModelProvider` protocol, and it needs a
-dependency and an API key, so it is a scope and authorization decision rather
-than something to assume. No such node exists yet.
+They are separate because they fail differently. A transport fault is not a bad
+answer; generating a transcript is not having it judged; and the thing being
+measured must not grade itself.
 
-Semantic metrics stay unmeasured until two blinded human reviewers adjudicate;
-authored labels verify the scorer and never reach quorum.
+`GATE-AGENT-MVP` waits on the review node, not merely on the baseline. That edge
+is what makes the gate impossible to fire on authored fixtures: every model reply
+in the scorer-verification corpus is scripted, and the evaluator already reports
+`sufficient_for_GATE-AGENT-MVP=False`.
+
+Semantic metrics stay UNMEASURED until two blinded reviewers reach field-level
+quorum. A coding agent may prepare review material and may never file a review.
 
 ## NEXT
 
-- A provider adapter node, once authorized — one implementation of
-  `ModelProvider`, whose only job is `live provider -> frozen transcript`.
-- Human adjudication of a genuine transcript by two blinded reviewers, which is
-  what unlocks the semantic metrics.
-- `GATE-AGENT-MVP` — verification node, after a real baseline exists.
+- `PROVIDER-001` — OpenAI transport behind the existing `ModelProvider`
+  protocol. Key from `OPENAI_API_KEY` only, model name configurable,
+  `store=False`, no tools, no streaming, optional `openai` extra. Suite stays
+  green with nothing installed.
+- `BASELINE-AGENT-001` — all eight fixtures, transcripts frozen at capture,
+  poor answers committed alongside good ones.
+- `REVIEW-AGENT-BASELINE-001` — two blinded human reviewers, filing
+  independently. Reaches `NEEDS_HUMAN` if they do not exist.
+- `GATE-AGENT-MVP` — verification node, after a reviewed baseline exists.
 - MPC5xx dataset work — still a separate measurable step.
 
 ## LATER

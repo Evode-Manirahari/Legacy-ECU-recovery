@@ -1,7 +1,7 @@
 # NODE: GATE-AGENT-MVP
 
 **Title:** Agent MVP gate
-**Depends on:** `EVAL-AGENT-001`
+**Depends on:** `EVAL-AGENT-001`, `REVIEW-AGENT-BASELINE-001`
 **Worker:** verification
 **Verification:** gate
 **Retry budget:** 0
