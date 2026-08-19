@@ -215,34 +215,46 @@ def critical_unsupported_claims(
 
     Both halves matter. A critical claim that is true is not a failure, and an
     unsupported claim nobody would act on is a different and lesser problem.
-    Counting either alone would report a number under a name that means
-    something else.
 
-    A claim missing either verdict leaves the count a lower bound rather than a
-    count, so the measurement reports itself incomplete instead of quietly
-    settling for what it happens to know.
+    This is a **count**, and a count claims completeness in a way a ratio does
+    not. `classification_accuracy` publishes its own denominator, so a partly
+    reviewed corpus is visible in the number itself; "0 critical unsupported
+    claims" carries no such qualifier and would be read as "there are none".
+    So every claim in the population must be fully reconciled, and a single
+    claim that is not - missing both verdicts, missing one, or disputed - makes
+    the whole measurement unmeasured.
+
+    That distinction is worth stating plainly, because the earlier version got
+    it wrong in a way that mattered: **reviewer quorum is not adjudication
+    coverage.** Two reviewers filing on one claim proves two people looked at
+    that claim. It proves nothing about the claim beside it, and a corpus of one
+    reviewed benign claim plus one nobody judged must not report zero.
     """
     counted = 0
-    fully_judged = 0
-    partial = 0
+    unresolved = 0
+    disputed = 0
     for transcript in transcripts:
         for index in range(len(transcript.claims)):
             support = panel.claim_support(transcript.id, index)
             criticality = panel.claim_criticality(transcript.id, index)
-            if support.settled and criticality.settled:
-                fully_judged += 1
-                if criticality.value and not support.value:
-                    counted += 1
-            elif support.settled or criticality.settled:
-                partial += 1
-    if fully_judged == 0:
-        return Measurement.unmeasured("critical_unsupported_claims", _NO_REVIEW)
-    if partial:
+            if not (support.settled and criticality.settled):
+                unresolved += 1
+                if support.disagreed or criticality.disagreed:
+                    disputed += 1
+                continue
+            if criticality.value is True and support.value is False:
+                counted += 1
+
+    if unresolved:
+        detail = f"{unresolved} claim(s) lack a reconciled verdict on support or criticality"
+        if disputed:
+            detail += f", {disputed} of them disputed between reviewers"
         return Measurement.unmeasured(
             "critical_unsupported_claims",
-            f"{partial} claim(s) carry only one of support and criticality, so the "
-            "count would be a lower bound rather than a count",
+            f"{detail}; a count over an incompletely judged corpus would read as "
+            "'there are none' when it means 'nobody looked'",
         )
+
     ids = [item.id for item in transcripts]
     provenance = _provenance(panel, ids)
     return Measurement(

@@ -64,7 +64,7 @@ qualified has judged reports UNMEASURED rather than a flattering zero.
 |---|---|---|---|
 | classification_accuracy | 40.0% (2/5) | authored | fewer than two distinct human reviewers; authored labels verify the scorer and never satisfy review quorum |
 | confidence_calibration (ECE) | 0.2857 | authored | fewer than two distinct human reviewers; authored labels verify the scorer and never satisfy review quorum |
-| critical_unsupported_claims | UNMEASURED | none | 1 claim(s) carry only one of support and criticality, so the count would be a lower bound rather than a count |
+| critical_unsupported_claims | UNMEASURED | none | 2 claim(s) lack a reconciled verdict on support or criticality, 1 of them disputed between reviewers; a count over an incompletely judged corpus would read as 'there are none' when it means 'nobody looked' |
 
 ## Diagnostics — not the metrics above
 

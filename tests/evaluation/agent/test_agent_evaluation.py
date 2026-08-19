@@ -479,28 +479,13 @@ def test_critical_unsupported_truth_table(supported: bool, critical: bool, expec
     assert measurement.count == expected
 
 
-@pytest.mark.parametrize("field", ["supported", "critical"])
-def test_a_half_judged_claim_leaves_the_count_unmeasured(field: str) -> None:
-    """A lower bound is not a count, and must not be published as one."""
-    kwargs: dict[str, object] = {"supported": False, "critical": True}
-    kwargs[field] = None
-    transcripts = (one_claim(),)
-    panel = panel_of(
-        human("t", "reviewer-a", **kwargs),  # type: ignore[arg-type]
-        human("t", "reviewer-b", **kwargs),  # type: ignore[arg-type]
-    )
-
-    measurement = critical_unsupported_claims(transcripts, panel)
-
-    assert measurement.measured is False
-    assert measurement.count is None
-
-
 def test_no_adjudication_at_all_is_unmeasured_not_zero() -> None:
+    """An empty panel is the extreme case of incomplete coverage, not a clean run."""
     measurement = critical_unsupported_claims((one_claim(),), ReviewPanel())
 
     assert measurement.measured is False
-    assert "two blinded reviewers" in measurement.reason
+    assert measurement.count is None
+    assert "nobody looked" in measurement.reason
 
 
 # --- 2. calibration is not accuracy ---
@@ -738,3 +723,155 @@ def test_the_lexical_diagnostic_stays_separate_and_ungated() -> None:
 
     assert run.metrics.classification_term_recall_diagnostic.denominator > 0
     assert not [metric for metric, _, _ in GATE_TARGETS if "term_recall" in metric]
+
+
+# --- reviewer quorum is not adjudication coverage ---
+
+
+def claims_transcript(transcript_id: str, count: int = 1) -> Transcript:
+    return Transcript(
+        id=transcript_id,
+        sample_id="multi_function_pipeline_v1",
+        subject="0x00001000",
+        scenario="synthetic",
+        investigation={
+            "claims": [
+                {"statement": f"s{i}", "support": "observed", "confidence": 0.5, "citations": []}
+                for i in range(count)
+            ],
+            "citation_checks": [],
+            "demotions": [],
+            "failure": None,
+        },
+    )
+
+
+def review_of(
+    transcript_id: str,
+    reviewer: str,
+    index: int,
+    supported: bool | None,
+    critical: bool | None,
+) -> Review:
+    return Review(
+        transcript_id=transcript_id,
+        reviewer=reviewer,
+        kind="human",
+        judgements=(
+            ClaimJudgement(claim_index=index, semantically_supported=supported, critical=critical),
+        ),
+    )
+
+
+def reconciled(transcript_id: str, index: int, supported: bool, critical: bool) -> list[Review]:
+    return [
+        review_of(transcript_id, "reviewer-a", index, supported, critical),
+        review_of(transcript_id, "reviewer-b", index, supported, critical),
+    ]
+
+
+def test_an_entirely_unjudged_claim_beside_a_judged_one_is_unmeasured() -> None:
+    """The gate-integrity hole, stated exactly.
+
+    One benign claim fully reviewed by two humans, one claim nobody judged at
+    all. The earlier implementation only noticed a claim with *one* verdict
+    missing, so a claim missing *both* fell through and the corpus reported zero
+    with human-quorum provenance — gate-eligible, on a corpus half of which
+    nobody had read.
+    """
+    transcripts = (claims_transcript("judged"), claims_transcript("unjudged"))
+    panel = panel_of(*reconciled("judged", 0, supported=True, critical=False))
+
+    measurement = critical_unsupported_claims(transcripts, panel)
+
+    assert measurement.measured is False
+    assert measurement.count is None
+    assert measurement.gate_eligible is False
+    assert "nobody looked" in measurement.reason
+
+
+def test_a_claim_disputed_on_both_axes_is_unmeasured() -> None:
+    transcripts = (claims_transcript("judged"), claims_transcript("disputed"))
+    panel = panel_of(
+        *reconciled("judged", 0, supported=True, critical=False),
+        review_of("disputed", "reviewer-a", 0, True, True),
+        review_of("disputed", "reviewer-b", 0, False, False),
+    )
+
+    measurement = critical_unsupported_claims(transcripts, panel)
+
+    assert measurement.measured is False
+    assert "disputed between reviewers" in measurement.reason
+
+
+@pytest.mark.parametrize(
+    "supported,critical,missing",
+    [(None, False, "support"), (False, None, "criticality")],
+)
+def test_a_claim_missing_either_verdict_is_unmeasured(
+    supported: bool | None, critical: bool | None, missing: str
+) -> None:
+    transcripts = (claims_transcript("judged"), claims_transcript("partial"))
+    panel = panel_of(
+        *reconciled("judged", 0, supported=True, critical=False),
+        *[
+            review_of("partial", reviewer, 0, supported, critical)
+            for reviewer in ("reviewer-a", "reviewer-b")
+        ],
+    )
+
+    measurement = critical_unsupported_claims(transcripts, panel)
+
+    assert measurement.measured is False, missing
+
+
+def test_a_second_claim_in_one_transcript_must_also_be_judged() -> None:
+    """Coverage is per claim, not per transcript."""
+    transcripts = (claims_transcript("two", count=2),)
+    panel = panel_of(*reconciled("two", 0, supported=False, critical=True))
+
+    measurement = critical_unsupported_claims(transcripts, panel)
+
+    assert measurement.measured is False
+
+
+def test_a_fully_reconciled_corpus_is_measured() -> None:
+    transcripts = (claims_transcript("a"), claims_transcript("b"))
+    panel = panel_of(
+        *reconciled("a", 0, supported=False, critical=True),
+        *reconciled("b", 0, supported=True, critical=False),
+    )
+
+    measurement = critical_unsupported_claims(transcripts, panel)
+
+    assert measurement.measured is True
+    assert measurement.count == 1
+    assert measurement.gate_eligible is True
+
+
+def test_quorum_alone_never_makes_an_incompletely_judged_count_gate_eligible() -> None:
+    """Two reviewer identities prove two people looked at *something*.
+
+    They say nothing about whether every claim was covered, and this metric is a
+    count, which is read as completeness.
+    """
+    transcripts = (claims_transcript("judged"), claims_transcript("unjudged"))
+    panel = panel_of(*reconciled("judged", 0, supported=True, critical=False))
+
+    assert panel.has_quorum("judged") is True
+    assert panel.has_quorum("unjudged") is False
+    assert panel.fully_human is True
+
+    measurement = critical_unsupported_claims(transcripts, panel)
+
+    assert measurement.gate_eligible is False
+    checks = {check.metric: check for check in check_gate(clean_metrics(critical=measurement))}
+    assert checks["critical_unsupported_claims"].passed is False
+
+
+def test_the_committed_corpus_reports_incomplete_coverage() -> None:
+    """Its planted disagreement leaves a claim unreconciled, so the count refuses."""
+    run = evaluate(TRANSCRIPTS)
+
+    assert run.metrics.critical_unsupported_claims.measured is False
+    assert run.metrics.review_disagreements
