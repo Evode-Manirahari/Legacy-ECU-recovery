@@ -23,6 +23,12 @@ dev = [
 ghidra = [
   "pyghidra>=2.2,<3",
 ]
+# The OpenAI transport that captures the agent baseline. Optional for the same
+# reason Ghidra is: the agent, the evaluator, and every test around them must
+# stay runnable on a host with no account, no key, and nothing installed.
+openai = [
+  "openai>=3.3,<4",
+]
 
 [project.scripts]
 ecu-recovery = "ecu_recovery.cli:main"
@@ -67,4 +73,14 @@ show_error_codes = true
 # (analysis/ghidra.py) is responsible for converting to typed plain records.
 [[tool.mypy.overrides]]
 module = ["pyghidra.*", "ghidra.*", "jpype.*", "java.*"]
+ignore_missing_imports = true
+
+# The openai extra is not installed for type checking: CI syncs `dev` only, so
+# the SDK is absent exactly as it is for a contributor with no account. Unlike
+# Ghidra this is not a typing gap - openai ships its own types - so what is
+# ignored is the module being missing, not the module being untyped. The
+# adapter converts to plain records at the boundary regardless, so no
+# vendor-shaped object reaches the rest of the project.
+[[tool.mypy.overrides]]
+module = ["openai", "openai.*"]
 ignore_missing_imports = true
