@@ -14,9 +14,15 @@ from typing import Any
 
 
 @dataclass
+class FakeOutputDetails:
+    reasoning_tokens: int = 0
+
+
+@dataclass
 class FakeUsage:
     input_tokens: int = 11
     output_tokens: int = 22
+    output_tokens_details: Any = field(default_factory=FakeOutputDetails)
 
     def model_dump(self, mode: str = "python") -> dict[str, Any]:
         del mode

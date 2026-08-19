@@ -12,7 +12,14 @@ import sys
 from typing import Any
 
 import pytest
-from provider_support import FakeClient, FakeIncomplete, FakeRawResponse, OptionlessClient
+from provider_support import (
+    FakeClient,
+    FakeIncomplete,
+    FakeOutputDetails,
+    FakeRawResponse,
+    FakeUsage,
+    OptionlessClient,
+)
 
 from ecu_recovery.agent.provider import (
     ModelProvider,
@@ -189,6 +196,42 @@ def test_every_transport_fault_arrives_through_the_declared_boundary(error: Exce
 
 def test_an_empty_reply_is_a_failure_not_an_answer() -> None:
     client = FakeClient(reply=FakeRawResponse(output_text="   "))
+    provider = OpenAIProvider(model="m", client=client)
+
+    with pytest.raises(ModelUnavailableError, match="no text"):
+        provider.complete(REQUEST)
+
+
+def test_an_exhausted_output_budget_is_not_reported_as_a_provider_fault() -> None:
+    """`max_output_tokens` bounds reasoning as well as visible output.
+
+    A reasoning model can therefore spend the whole budget thinking and return
+    nothing, which needs the budget raised - not the network investigated. If
+    this were reported as "no text", a frozen baseline of eight empty samples
+    would send a reader after the wrong cause.
+    """
+    client = FakeClient(
+        reply=FakeRawResponse(
+            output_text="",
+            status="incomplete",
+            incomplete_details=FakeIncomplete(reason="max_output_tokens"),
+            usage=FakeUsage(output_tokens_details=FakeOutputDetails(reasoning_tokens=2040)),
+        )
+    )
+    provider = OpenAIProvider(model="m", client=client)
+
+    with pytest.raises(ModelUnavailableError) as raised:
+        provider.complete(REQUEST)
+
+    message = str(raised.value)
+    assert "2048-token output budget" in message
+    assert "2040 of them on reasoning" in message
+    assert "raise the budget" in message
+
+
+def test_an_unexplained_empty_reply_still_reads_as_one() -> None:
+    """The budget wording must not be pinned onto every empty reply."""
+    client = FakeClient(reply=FakeRawResponse(output_text="", status="completed"))
     provider = OpenAIProvider(model="m", client=client)
 
     with pytest.raises(ModelUnavailableError, match="no text"):
