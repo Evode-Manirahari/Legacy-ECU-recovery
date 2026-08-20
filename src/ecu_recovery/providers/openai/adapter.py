@@ -102,6 +102,36 @@ def _incomplete_reason(raw: Any) -> str:
     return str(getattr(details, "reason", "") or "")
 
 
+def _reasoning_tokens(raw: Any) -> int | None:
+    """How much of the output budget went on reasoning, when the API says.
+
+    Worth surfacing: it is the difference between "the model had nothing to
+    say" and "the model was still thinking when the budget ran out".
+    """
+    details = getattr(getattr(raw, "usage", None), "output_tokens_details", None)
+    tokens = getattr(details, "reasoning_tokens", None)
+    return tokens if isinstance(tokens, int) else None
+
+
+def _empty_reply(status: str, reason: str, budget: int, raw: Any) -> str:
+    """Say why the reply was empty, because the two causes need opposite fixes.
+
+    `max_output_tokens` bounds reasoning tokens as well as visible ones, so a
+    reasoning model can spend an entire budget thinking and return nothing. That
+    is a budget set too low, not a provider fault, and calling it "no text"
+    would send whoever reads the frozen transcript looking at the network.
+    """
+    if reason == "max_output_tokens":
+        spent = _reasoning_tokens(raw)
+        detail = f", {spent} of them on reasoning" if spent else ""
+        return (
+            f"the model used its entire {budget}-token output budget{detail} without "
+            "emitting text; max_output_tokens bounds reasoning as well as visible output, "
+            "so raise the budget rather than treating this as a provider fault"
+        )
+    return f"the provider returned no text (status {status or 'unknown'})"
+
+
 class OpenAIProvider:
     """`ModelProvider` over the OpenAI Responses API.
 
@@ -170,17 +200,15 @@ class OpenAIProvider:
             )
         except Exception as error:
             raise ModelUnavailableError(_describe(error)) from error
-        return self._to_response(raw)
+        return self._to_response(raw, request.max_output_tokens)
 
-    def _to_response(self, raw: Any) -> ModelResponse:
+    def _to_response(self, raw: Any, budget: int) -> ModelResponse:
         text = _text_of(raw)
         returned = str(getattr(raw, "model", "") or "")
         status = str(getattr(raw, "status", "") or "")
         reason = _incomplete_reason(raw)
         if not text.strip():
-            raise ModelUnavailableError(
-                f"the provider returned no text (status {status or 'unknown'})"
-            )
+            raise ModelUnavailableError(_empty_reply(status, reason, budget, raw))
         return ModelResponse(
             text=text,
             provider=PROVIDER_NAME,
