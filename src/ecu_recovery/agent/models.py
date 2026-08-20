@@ -222,8 +222,24 @@ class Investigation:
 
 @dataclass(frozen=True)
 class InvestigationBudget:
-    """Bounds on one investigation, so a run cannot grow without limit."""
+    """Bounds on one investigation, so a run cannot grow without limit.
 
+    `max_output_tokens` is the one bound here that can be set too *low*. The
+    others cap how much the model is shown; this one caps what it may produce,
+    and on a reasoning model that ceiling covers reasoning as well as visible
+    output. Set it too tightly and the model spends the whole allowance
+    thinking and returns nothing - a failure that looks like a broken provider
+    and is not one.
+
+    That is a reason to make the ceiling settable, not a reason to raise it
+    here. The default stays where it has always been; an experiment that needs
+    more room states how much it needs, and that number becomes part of its
+    provenance rather than something it inherited without noticing.
+    """
+
+    #: Unchanged. A caller that needs more room passes it explicitly, so the
+    #: value used is recorded by whoever chose it.
+    max_output_tokens: int = 2048
     max_instructions: int = 64
     max_callers: int = 20
     max_callees: int = 20

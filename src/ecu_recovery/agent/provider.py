@@ -34,6 +34,9 @@ class ModelRequest:
 
     instructions: str
     context: str
+    #: A fallback for direct construction. The production path does not reach
+    #: it: `build_request` supplies the ceiling from `InvestigationBudget`,
+    #: where it is documented and can be set per investigation.
     max_output_tokens: int = 2048
 
     def as_dict(self) -> dict[str, Any]:
