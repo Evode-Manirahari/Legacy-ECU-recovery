@@ -156,6 +156,32 @@ def test_the_instructions_forbid_inventing_citations() -> None:
     assert '"unknown"' in request.instructions
 
 
+def test_the_output_budget_comes_from_the_budget_object() -> None:
+    """It used to be a constant, beside a `budget` argument nobody read.
+
+    The dead variable is why the constant went unnoticed, so the regression is
+    on the wiring: a supplied ceiling must reach the request.
+    """
+    sheet = gather_facts(fake_context(), SUBJECT)
+
+    request = build_request(sheet, InvestigationBudget(max_output_tokens=8192))
+
+    assert request.max_output_tokens == 8192
+
+
+def test_the_default_output_budget_is_unchanged() -> None:
+    """This change makes the ceiling settable; it does not retune the agent.
+
+    An experiment that needs more room states how much, and that number becomes
+    part of its provenance instead of arriving through a global default nobody
+    chose.
+    """
+    request = build_request(gather_facts(fake_context(), SUBJECT))
+
+    assert InvestigationBudget().max_output_tokens == 2048
+    assert request.max_output_tokens == 2048
+
+
 # --- parsing, strictly ---
 
 

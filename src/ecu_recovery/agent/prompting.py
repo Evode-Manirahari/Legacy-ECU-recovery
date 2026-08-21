@@ -64,7 +64,7 @@ def build_request(sheet: FactSheet, budget: InvestigationBudget | None = None) -
     return ModelRequest(
         instructions=INSTRUCTIONS.rstrip(),
         context=render_fact_sheet(sheet),
-        max_output_tokens=2048,
+        max_output_tokens=budget.max_output_tokens,
     )
 
 
