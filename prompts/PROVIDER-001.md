@@ -18,7 +18,7 @@ failure and a bad answer are never the same incident.
 ## Ownership
 
 Allowed: `src/ecu_recovery/providers/openai/**`, `tests/providers/openai/**`,
-`pyproject.toml`.
+`pyproject.toml`, `uv.lock`.
 
 Its own tree, deliberately outside `src/ecu_recovery/agent/**`. `AGENT-001` owns
 the protocol and the bounded reasoning path and is already verified; a provider
@@ -27,6 +27,13 @@ must not be able to reach into it.
 `pyproject.toml` is included for **one line**: an optional `openai` extra. Do not
 add it to `dependencies`. The default install and the whole test suite stay free
 of it, exactly as they are of Ghidra.
+
+`uv.lock` follows from that extra. The lock already pins `pyghidra` for the
+`ghidra` extra; without the same entry for `openai`, `uv sync --extra openai`
+rewrites the lock rather than installing from it, which hands whoever runs the
+capture an unexpected lockfile diff inside a commit whose whole purpose is a
+frozen artifact. `uv sync --extra openai --frozen` must work from a clean
+checkout of the committed `pyproject.toml` and `uv.lock`.
 
 Forbidden: `src/ecu_recovery/agent/**`, `src/ecu_recovery/evaluation/**`,
 `artifacts/**`. If the protocol genuinely needs to change, report it as an
