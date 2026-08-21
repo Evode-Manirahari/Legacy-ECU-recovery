@@ -447,6 +447,13 @@ nodes:
       - src/ecu_recovery/providers/openai/**
       - tests/providers/openai/**
       - pyproject.toml
+      # uv.lock follows pyproject.toml. The lock pins pyghidra for the ghidra
+      # extra, and without the same entry for openai `uv sync --extra openai`
+      # rewrites the lock instead of installing from it - handing whoever runs
+      # the capture an unexpected lockfile diff mixed into a commit whose whole
+      # purpose is a frozen artifact. Authorized here rather than taken by the
+      # worker, because a node does not widen its own ownership.
+      - uv.lock
     verification:
       type: commands
       commands:
