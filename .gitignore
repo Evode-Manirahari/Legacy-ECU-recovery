@@ -10,10 +10,18 @@ build/
 # Local scratch output (databases, ad-hoc reports) is ignored, but recorded
 # evaluation and integration results are tracked: EVALS.md requires a baseline
 # that is never silently replaced, which only works if it is committed.
+#
+# artifacts/agent-baseline/ added 2026-08-28, authorized in #48. It holds the
+# frozen real-model transcripts, the capture records that attest them, and the
+# subject manifest - the most literal case of the rule above, and the one that
+# had no exception. Without it BASELINE-AGENT-001 would have written its outputs,
+# reported them committed, and had git drop them silently: a single unrepeatable
+# run surviving on one machine and nowhere else.
 artifacts/*
 !artifacts/README.md
 !artifacts/evals/
 !artifacts/integration/
+!artifacts/agent-baseline/
 samples/*.bin
 samples/*.hex
 samples/*.srec

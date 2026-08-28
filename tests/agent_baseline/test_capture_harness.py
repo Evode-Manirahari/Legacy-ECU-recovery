@@ -412,17 +412,18 @@ def test_the_transcript_carries_no_ground_truth_role(tmp_path: Path) -> None:
 # --- the manifest gate ---
 
 
-def test_no_subject_manifest_is_frozen_yet() -> None:
-    """The state this branch is in, asserted rather than described.
+def test_a_manifest_is_frozen_and_an_unset_identity_still_refuses() -> None:
+    """Inverted when the manifest was frozen; the guard it carried is kept.
 
-    Four of the eight samples designate more than one classification function,
-    so one subject per fixture is a human choice. Until it is made and its
-    digest recorded, the capture cannot start.
+    A manifest now exists and its identity is recorded, so the first half of
+    this is a statement of fact. The second half is the part worth keeping: with
+    no identity recorded there is nothing to verify against, and the loader must
+    refuse rather than accept whatever file it finds.
     """
-    assert SUBJECT_MANIFEST_ID == ""
+    assert SUBJECT_MANIFEST_ID.startswith("M-")
 
     with pytest.raises(BaselinePreparationError, match="no subject manifest has been frozen"):
-        load_subject_manifest()
+        load_subject_manifest(expected_id="")
 
 
 def test_a_frozen_manifest_loads_when_its_digest_matches(tmp_path: Path) -> None:
