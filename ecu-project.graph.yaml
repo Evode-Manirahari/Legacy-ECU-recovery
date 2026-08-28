@@ -461,6 +461,61 @@ nodes:
     retry_budget: 2
     note: One completion request in, text out. No tools, no streaming, no storage.
 
+  PROVENANCE-001:
+    title: Verifiable capture provenance
+    # A repair node, opened by independent review of PROVIDER-001 before any
+    # real call was made. Two findings, one cause: nothing between the transport
+    # and the gate carries proof of what produced a reply.
+    #
+    # The adapter returns the whole provider record - returned model, response
+    # id, usage, truncation - and `investigate` keeps two strings of it. The
+    # rest is dropped before anything is frozen, so a transcript cannot say what
+    # answered.
+    #
+    # And `evaluate` derives run provenance from `transcript.provenance`, a
+    # free-text field nothing stands behind. A hand-written file saying "model"
+    # is reported as a real-model baseline, which satisfies GATE-AGENT-MVP
+    # invariants 2 and 4 on the strength of that string alone. A rule the
+    # machinery does not check is a comment, and BASELINE-AGENT-001 already
+    # carries the rule.
+    #
+    # Depends on EVAL-AGENT-001 rather than on PROVIDER-001, deliberately. It
+    # slices the agent and evaluator trees, both upstream of that edge, so
+    # ordering makes the overlap safe - and it does not wait on PROVIDER-001,
+    # which is under review. The two are independent siblings owning disjoint
+    # paths and may run concurrently.
+    depends_on:
+      - EVAL-AGENT-001
+    status: PENDING
+    worker: coding-agent
+    prompt: prompts/PROVENANCE-001.md
+    # Files, not trees. A repair owning `src/ecu_recovery/agent/**` could
+    # rewrite the verified agent; owning models.py and investigator.py can only
+    # change what a finished investigation records about the call behind it.
+    #
+    # Both test trees overlap their originating nodes exactly, safe for the
+    # reason REPORT-001's overlaps were: this node is transitively downstream of
+    # AGENT-001 and directly downstream of EVAL-AGENT-001, so it never runs
+    # beside either.
+    #
+    # `artifacts/evals/agent/**` is deliberately absent. The recorded score of
+    # the authored corpus is the control for this repair, and a node that could
+    # rewrite it could hide a change in what the evaluator reports.
+    allowed_paths:
+      - src/ecu_recovery/agent/models.py
+      - src/ecu_recovery/agent/investigator.py
+      - src/ecu_recovery/evaluation/agent/captures.py
+      - src/ecu_recovery/evaluation/agent/transcripts.py
+      - src/ecu_recovery/evaluation/agent/runner.py
+      - tests/agent/**
+      - tests/evaluation/agent/**
+    verification:
+      type: commands
+      commands:
+        - uv run pytest
+    retry_budget: 2
+    note: The gate stops trusting a word in a file and starts checking a record.
+
   BASELINE-AGENT-001:
     title: First real-model baseline transcripts
     # Experiment execution. Runs the existing agent over all eight fixtures with
@@ -469,6 +524,11 @@ nodes:
     # stops the thing being measured from grading itself.
     depends_on:
       - PROVIDER-001
+      # Added 2026-08-27. Capture cannot prove what produced a reply until the
+      # record exists to prove it with, and a baseline frozen before that would
+      # have to be recaptured to be certifiable - a second round of real calls
+      # to fix something that was known beforehand.
+      - PROVENANCE-001
     status: PENDING
     worker: coding-agent
     prompt: prompts/BASELINE-AGENT-001.md
@@ -476,7 +536,17 @@ nodes:
     # be confused with the authored fixtures that verify the scorer.
     allowed_paths:
       - artifacts/agent-baseline/transcripts/**
+      # One immutable record per real call, written at capture time and never
+      # edited. It is what makes provenance checkable rather than asserted, so
+      # it is a separate tree from the transcripts that reference it: a
+      # transcript is what the model said, a capture is what the provider did.
+      # Authorized here rather than taken by the worker.
+      - artifacts/agent-baseline/captures/**
       - artifacts/agent-baseline/results/**
+      # The capture harness lives here too. This node owns no source tree by
+      # design - it runs the system rather than changing it - and a driver that
+      # makes eight real calls needs a home that is named rather than improvised
+      # at capture time.
       - tests/agent_baseline/**
     verification:
       type: commands

@@ -32,8 +32,9 @@ uv run ecu-recovery graph ready
 | `GATE-STATIC-MVP` | PASSED | all twelve static MVP properties verified 2026-08-18 |
 | `AGENT-001` | PASSED | verified after PR #29; claims are checked against gathered facts |
 | `EVAL-AGENT-001` | PENDING | **READY** — no agent measurement exists |
-| `PROVIDER-001` | PENDING | **READY** — no OpenAI transport exists |
-| `BASELINE-AGENT-001` | PENDING | no real-model transcripts exist |
+| `PROVIDER-001` | PENDING | **READY** — implementation merged (#35, #36, #37, #40); pass under review in #38 |
+| `PROVENANCE-001` | PENDING | **READY** — repair; provenance is self-asserted and the provider record is discarded |
+| `BASELINE-AGENT-001` | PENDING | waits on `PROVIDER-001` and `PROVENANCE-001`; no real-model transcripts exist |
 | `REVIEW-AGENT-BASELINE-001` | PENDING | human gate; no blinded reviews exist |
 | `GATE-AGENT-MVP` | PENDING | waits on `REVIEW-AGENT-BASELINE-001` |
 
@@ -68,9 +69,24 @@ claims to detect.
 means something:
 
 ```text
-PROVIDER-001  ->  BASELINE-AGENT-001  ->  REVIEW-AGENT-BASELINE-001  ->  GATE-AGENT-MVP
-  transport         experiment              human gate                    verification
+PROVIDER-001  ─┐
+  transport     ├─>  BASELINE-AGENT-001  ->  REVIEW-AGENT-BASELINE-001  ->  GATE-AGENT-MVP
+PROVENANCE-001 ┘      experiment               human gate                    verification
+  proof of capture
 ```
+
+`PROVENANCE-001` was added 2026-08-27, after independent review of
+`PROVIDER-001` found two defects and before any real call was made. The adapter
+returns the whole provider record and `investigate` keeps two strings of it, so
+a frozen transcript cannot say what answered; and the evaluator derives
+real-model provenance from a free-text field, so a hand-written transcript
+saying `"provenance": "model"` is accepted as a baseline. Capture must be able
+to prove what produced a reply before it produces eight of them — otherwise the
+first baseline has to be paid for twice.
+
+It depends on `EVAL-AGENT-001`, not on `PROVIDER-001`: it repairs the agent and
+evaluator trees, which sit behind that edge, and the two are independent
+siblings with disjoint ownership that may run concurrently.
 
 They are separate because they fail differently. A transport fault is not a bad
 answer; generating a transcript is not having it judged; and the thing being
@@ -90,8 +106,11 @@ quorum. A coding agent may prepare review material and may never file a review.
   protocol. Key from `OPENAI_API_KEY` only, model name configurable,
   `store=False`, no tools, no streaming, optional `openai` extra. Suite stays
   green with nothing installed.
+- `PROVENANCE-001` — the capture record, its content-derived id, and the
+  evaluator's linkage check. No API call; every test uses a double.
 - `BASELINE-AGENT-001` — all eight fixtures, transcripts frozen at capture,
-  poor answers committed alongside good ones.
+  each referencing the capture record written when the call was made, poor
+  answers committed alongside good ones.
 - `REVIEW-AGENT-BASELINE-001` — two blinded human reviewers, filing
   independently. Reaches `NEEDS_HUMAN` if they do not exist.
 - `GATE-AGENT-MVP` — verification node, after a reviewed baseline exists.
