@@ -36,7 +36,7 @@ def render_report(run: AgentEvaluationRun) -> str:
     ]
     if run.adversarial:
         lines += [
-            f"**Detector verification: {_status(run.detection_verified)}** — "
+            f"**Detector verification: {run.detection_status.render()}** — "
             f"gate over this corpus: {_status(run.gate_passed)}, expected to fail",
             "",
             "> **This corpus contains deliberately planted defects.** Fabricated",
@@ -76,7 +76,7 @@ def render_report(run: AgentEvaluationRun) -> str:
         f"- {run.provenance.detail}",
         f"- transcripts scored: {metrics.transcripts}",
         f"- adversarial corpus: {run.adversarial}",
-        f"- detector verification: {_status(run.detection_verified)}",
+        f"- detector verification: {run.detection_summary}",
         f"- adjudicators: {', '.join(run.adjudicators) or 'none'}",
         f"- results schema: {SCHEMA_VERSION}",
         "",

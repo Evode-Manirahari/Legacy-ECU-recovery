@@ -15,6 +15,7 @@ import json
 import sys
 from pathlib import Path
 
+from .models import DetectionStatus
 from .report import render_report
 from .runner import evaluate
 
@@ -42,7 +43,7 @@ def main(argv: list[str] | None = None) -> int:
             f"{check.render_target():>8}  {check.render_observed()}"
         )
     print(f"adversarial_corpus={run.adversarial}")
-    print(f"detector_verification={'PASS' if run.detection_verified else 'FAIL'}")
+    print(f"detector_verification={run.detection_status.value}")
     for mismatch in run.detection_mismatches:
         print(f"  mismatch: {mismatch}")
     print(f"gate_would_pass={run.gate_passed}")
@@ -56,7 +57,14 @@ def main(argv: list[str] | None = None) -> int:
     # Over an adversarial corpus the gate is expected to fail, so success means
     # the scorer found exactly what was planted. Over a clean corpus it means
     # the gate held.
-    return 0 if (run.detection_verified if run.adversarial else run.gate_passed) else 1
+    #
+    # NOT_APPLICABLE is not success. A corpus can only be adversarial if some
+    # transcript declares planted defects, so reaching this branch with nothing
+    # in scope means the declaring transcripts were all excluded - a state worth
+    # a non-zero exit rather than a quiet zero. Written out rather than left to
+    # the truthiness of a tri-state.
+    succeeded = run.detection_status is DetectionStatus.PASS if run.adversarial else run.gate_passed
+    return 0 if succeeded else 1
 
 
 if __name__ == "__main__":

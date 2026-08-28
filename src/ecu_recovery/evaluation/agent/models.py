@@ -16,6 +16,7 @@ the model being wrong, it is the checking having failed.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import StrEnum
 from typing import Any, ClassVar
 
 from ..models import Ratio, total
@@ -25,6 +26,44 @@ SCHEMA_VERSION = 1
 #: A claim asserting something about the program, as opposed to admitting it
 #: cannot tell. Only these carry an evidential burden.
 FACTUAL_SUPPORT = ("observed", "inferred")
+
+
+class DetectionStatus(StrEnum):
+    """Whether the scorer was checked against planted defects, or could not be.
+
+    Three states because two are not enough, and the third is not a milder
+    version of either. PASS and FAIL both assert that a check ran and report its
+    outcome. NOT_APPLICABLE says no check ran, which is neither a failure nor -
+    and this is the trap - a success.
+
+    The distinction exists because detector verification only means anything
+    over a corpus that declares what it plants. Authored fixtures do; a captured
+    transcript cannot, because nothing was planted in a real call. Scoring one
+    as though it were the other produced a run reporting FAIL over genuine
+    samples described as defective fixtures, and the obvious repair - letting
+    that read PASS instead - would have replaced a visible wrong answer with an
+    invisible one.
+    """
+
+    PASS = "PASS"
+    FAIL = "FAIL"
+    NOT_APPLICABLE = "NOT_APPLICABLE"
+
+    @classmethod
+    def of(cls, in_scope: int, mismatches: tuple[str, ...]) -> DetectionStatus:
+        """The status a run earned, from how much was checked and what it found.
+
+        Scope first, deliberately. An empty mismatch list means "nothing was
+        wrong" only when something was examined; over an empty scope it means
+        nothing at all, and reading it as PASS is exactly the claim this enum
+        exists to prevent.
+        """
+        if in_scope <= 0:
+            return cls.NOT_APPLICABLE
+        return cls.FAIL if mismatches else cls.PASS
+
+    def render(self) -> str:
+        return "NOT APPLICABLE" if self is DetectionStatus.NOT_APPLICABLE else self.value
 
 
 @dataclass(frozen=True)
@@ -342,6 +381,12 @@ class AgentEvaluationRun:
     gate: tuple[Any, ...] = field(default_factory=tuple)
     #: Where the scorer disagreed with what a fixture said it planted.
     detection_mismatches: tuple[str, ...] = ()
+    #: How many transcripts detector verification actually applied to.
+    #:
+    #: Defaults to zero, so a run that does not state its scope reports
+    #: NOT_APPLICABLE rather than inheriting a pass. An unstated scope is not
+    #: evidence that everything was checked.
+    detection_in_scope: int = 0
     #: True when the corpus deliberately contains defects, in which case gate
     #: failure is the expected outcome and says nothing about the agent.
     adversarial: bool = False
@@ -354,9 +399,36 @@ class AgentEvaluationRun:
         return all(check.passed for check in self.gate)
 
     @property
-    def detection_verified(self) -> bool:
-        """Every planted defect found, and none invented."""
-        return not self.detection_mismatches
+    def detection_status(self) -> DetectionStatus:
+        """Every planted defect found and none invented - or nothing to check."""
+        return DetectionStatus.of(self.detection_in_scope, self.detection_mismatches)
+
+    @property
+    def detection_verified(self) -> bool | None:
+        """The status as a boolean, or None when there is no status to give.
+
+        None rather than a string, because a consumer that tests this value
+        without thinking should get the safe answer. `null` is falsy, so a
+        naive check reads an unverified run as unverified; a self-describing
+        string would be truthy and would read as a pass, which is the failure
+        mode this whole node exists to remove.
+
+        Code inside this package uses `detection_status`. This exists for the
+        serialized record, where the field has always been a boolean.
+        """
+        if self.detection_status is DetectionStatus.NOT_APPLICABLE:
+            return None
+        return self.detection_status is DetectionStatus.PASS
+
+    @property
+    def detection_summary(self) -> str:
+        """The status as a reader should see it, with the reason when there is one."""
+        if self.detection_status is not DetectionStatus.NOT_APPLICABLE:
+            return self.detection_status.render()
+        return (
+            "NOT APPLICABLE — no transcript here declares planted defects, so there is "
+            "nothing for the detector to have found or missed"
+        )
 
     @property
     def baseline_only(self) -> bool:
