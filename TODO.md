@@ -35,7 +35,8 @@ uv run ecu-recovery graph ready
 | `PROVIDER-001` | PASSED | verified after #35, #36, #39 and #40; transport only, one attempt, no key on disk |
 | `PROVENANCE-001` | PASSED | verified after PR #42; a claim of model provenance is checked against a capture record |
 | `DETECTION-SCOPE-001` | PASSED | verified after PR #45; detector verification has a scope and a third answer |
-| `BASELINE-AGENT-001` | PENDING | **READY** — all three prerequisites passed; no real-model transcripts exist yet |
+| `BASELINE-PREFLIGHT-001` | PENDING | **READY** — authorized after the pre-spend checklist; a configured run with no `openai` extra freezes eight failure transcripts that evaluate as `model` |
+| `BASELINE-AGENT-001` | PENDING | waits on `BASELINE-PREFLIGHT-001`; no real-model transcripts exist yet |
 | `REVIEW-AGENT-BASELINE-001` | PENDING | human gate; no blinded reviews exist |
 | `GATE-AGENT-MVP` | PENDING | waits on `REVIEW-AGENT-BASELINE-001` |
 
@@ -66,25 +67,34 @@ SPEC-001 → REPO-001 → GRAPH-001 ─┬─→ DATA-001 ─→ GHIDRA-001 ─�
 nothing else: no capture, no scoring, no tools, no streaming, no storage. The
 suite still runs green with no key and no extra installed.
 
-`PROVENANCE-001` and `DETECTION-SCOPE-001` have passed too, so
-`BASELINE-AGENT-001` is `READY` — the first node in this project that spends
-money and leaves the machine.
+`PROVENANCE-001` and `DETECTION-SCOPE-001` have passed too. The baseline is
+blocked once more, deliberately, behind `BASELINE-PREFLIGHT-001`.
+
+That node was authorized 2026-08-28 from the pre-spend checklist, which found a
+fourth case walking past all three refusals `#50` had just installed.
+Configuration being *present* is not the transport being *available*: with
+`OPENAI_API_KEY` and `OPENAI_MODEL` both set and the `openai` extra absent, the
+configuration guard passes, the SDK import fails inside the call, `investigate`
+records an unreachable provider as an outcome, and the run completes — eight
+transcripts labelled `provenance: model`, eight capture records the evaluator
+verifies, `is_real_model=True`, and not one request off the machine.
+
+Reproduced with no network reached, in the environment the run would have used;
+the extra is not installed here, so the trap was armed rather than hypothetical.
+A complete baseline of nothing, indistinguishable from a real one taken during
+an outage — and a transcript is frozen at capture, so finding it afterwards
+costs a second round of real calls.
+
+The repair is local readiness only. No health check, no credential probe, no
+connectivity test: once the eight calls begin, a provider or network failure is
+an **outcome** of the frozen experiment, never a reason to retry or adapt.
 
 ```text
-PROVIDER-001         PASSED   transport          ┐
-PROVENANCE-001       PASSED   proof of capture   ├─>  BASELINE-AGENT-001 ─> REVIEW-AGENT-BASELINE-001 ─> GATE-AGENT-MVP
-DETECTION-SCOPE-001  PASSED   scope of a status  ┘          READY                  human gate              verification
+PROVIDER-001            PASSED   transport            ┐
+PROVENANCE-001          PASSED   proof of capture     ├─>  BASELINE-AGENT-001 ─> REVIEW-AGENT-BASELINE-001 ─> GATE-AGENT-MVP
+DETECTION-SCOPE-001     PASSED   scope of a status    │       spend gate                human gate              verification
+BASELINE-PREFLIGHT-001  READY    transport is present ┘
 ```
-
-Three prerequisites belong to whoever starts the capture, not to the code:
-
-1. `OPENAI_API_KEY` exported. The adapter reads it from nowhere else.
-2. `OPENAI_MODEL` set to an identifier the API actually reports. Nothing is
-   defaulted; a snapshot name is never invented. What answered is recorded from
-   the response rather than from the request.
-3. The output budget understood. `max_output_tokens` bounds reasoning as well
-   as visible output, so a ceiling set for the size of a JSON reply can be
-   spent entirely on thinking and return nothing.
 
 `DETECTION-SCOPE-001` passed 2026-08-28, before the eight real calls rather than
 after them. `verify_detection` reported a mismatch for any transcript with no
@@ -107,7 +117,7 @@ is derived from verified capture linkage rather than from a transcript's own
 provenance string — an exemption a transcript could declare for itself would
 hand back, in a new place, exactly what `PROVENANCE-001` closed.
 
-Three prerequisites belong to whoever starts the capture, not to the code:
+Four prerequisites belong to whoever starts the capture, not to the code:
 
 1. `OPENAI_API_KEY` exported. The adapter reads it from nowhere else.
 2. `OPENAI_MODEL` set to an identifier the API actually reports. Nothing is
@@ -116,6 +126,9 @@ Three prerequisites belong to whoever starts the capture, not to the code:
 3. The output budget understood. `max_output_tokens` bounds reasoning as well
    as visible output, so a ceiling set for the size of a JSON reply can be
    spent entirely on thinking and return nothing.
+4. The frozen environment used, every time: `uv run --extra openai --frozen`,
+   with `git diff --exit-code uv.lock` before committing. A bare `uv run`
+   re-resolved and bumped `openai 3.3.1 -> 3.5.0` once already.
 
 `PROVENANCE-001` passed 2026-08-28. It was added the day before, after
 independent review of `PROVIDER-001` found two defects and before any real call

@@ -80,6 +80,7 @@ PRE_FAN_OUT: Mapping[str, NodeStatus] = {
     "PROVIDER-001": NodeStatus.PENDING,
     "PROVENANCE-001": NodeStatus.PENDING,
     "DETECTION-SCOPE-001": NodeStatus.PENDING,
+    "BASELINE-PREFLIGHT-001": NodeStatus.PENDING,
     "BASELINE-AGENT-001": NodeStatus.PENDING,
     "REVIEW-AGENT-BASELINE-001": NodeStatus.PENDING,
     "GATE-AGENT-MVP": NodeStatus.PENDING,

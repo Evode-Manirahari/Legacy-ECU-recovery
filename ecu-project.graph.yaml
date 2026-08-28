@@ -665,6 +665,67 @@ nodes:
     # its ownership. Five files changed, none outside the allowed paths.
     note: Verified after PR #45; a status over zero checks is not a status.
 
+  BASELINE-PREFLIGHT-001:
+    title: Local transport readiness before the baseline spends
+    # A repair node, opened after the pre-spend checklist reproduced a defect of
+    # the same family as the three PROVENANCE-001 and #50 closed: a check that
+    # exists and runs, but runs after the money.
+    #
+    # With OPENAI_API_KEY and OPENAI_MODEL both set and the `openai` extra
+    # absent, the harness completes. The configuration guard passes because the
+    # configuration is genuinely there; the SDK import then fails inside the
+    # call, `investigate` records an unreachable provider as an *outcome* rather
+    # than an error, and the run produces eight transcripts labelled
+    # `provenance: model`, each backed by a capture record the evaluator
+    # verifies. Reproduced 2026-08-28 with no network reached, since the import
+    # fails before any client or socket exists:
+    #
+    #     run COMPLETED. transcripts=8 captures=8
+    #     failure    = 'model unavailable: the openai extra is not installed'
+    #     provenance = 'model'
+    #     evaluator  : kind='model' is_real_model=True baseline_only=False
+    #
+    # That is a complete baseline of nothing, indistinguishable from a real one
+    # taken during an outage. It has to be closed before the capture, not after:
+    # a transcript is frozen at capture and never edited, so discovering this
+    # afterwards costs a second round of real calls.
+    depends_on:
+      # The transport whose local availability this checks. Nothing else is
+      # needed: the repair is a readiness check in the harness, and the adapter
+      # already raises the right error - just too late to be free.
+      - PROVIDER-001
+    status: PENDING
+    worker: coding-agent
+    prompt: prompts/BASELINE-PREFLIGHT-001.md
+    # Two files. The check belongs beside the other pre-spend guards in the
+    # harness, and its regressions need a home; the existing guard tests are
+    # authorized because adding a check to that sequence changes which refusal
+    # a configured run meets first, and a node that cannot repair the tests it
+    # moves would have to leave them failing.
+    #
+    # Deliberately NOT authorized: `src/ecu_recovery/**`. Inspection before
+    # opening this node found the defect entirely repairable in the harness -
+    # the SDK's availability is answerable locally, and the adapter's own error
+    # is already correct. Evaluator and provenance semantics stay untouched, as
+    # they did through #45 and #50.
+    allowed_paths:
+      - tests/agent_baseline/capture_harness.py
+      - tests/agent_baseline/test_transport_preflight.py
+      - tests/agent_baseline/test_prespend_guards.py
+    verification:
+      type: commands
+      commands:
+        # Without the extra, deliberately. The suite must stay green on a host
+        # that has no SDK installed - that is the condition this node exists to
+        # make safe, so it is the condition its own tests run under.
+        - uv run --frozen pytest
+        # The lock must not move. A bare `uv run` re-resolved and bumped openai
+        # 3.3.1 -> 3.5.0 once already, and the run this protects is the one
+        # whose whole purpose is a frozen artifact.
+        - git diff --exit-code uv.lock
+    retry_budget: 2
+    note: Prove the transport can be reached locally. Do not call the provider to find out.
+
   BASELINE-AGENT-001:
     title: First real-model baseline transcripts
     # Experiment execution. Runs the existing agent over all eight fixtures with
@@ -683,6 +744,13 @@ nodes:
       # that afterwards means re-scoring a frozen run to change what its report
       # says, which is the one thing a frozen run is supposed to prevent.
       - DETECTION-SCOPE-001
+      # Added 2026-08-28, from the pre-spend checklist. Configuration being
+      # present is not the transport being available: with both variables set
+      # and the extra absent, this node would freeze eight failure transcripts
+      # that evaluate as real-model provenance without a single request having
+      # left the machine. The edge also orders the two nodes, which is what
+      # makes their shared ownership of tests/agent_baseline/** safe.
+      - BASELINE-PREFLIGHT-001
     status: PENDING
     worker: coding-agent
     prompt: prompts/BASELINE-AGENT-001.md
