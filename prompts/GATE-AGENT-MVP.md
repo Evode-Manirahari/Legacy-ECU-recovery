@@ -14,12 +14,17 @@ final reviewed metrics.
 
 ## Evidence sources
 
-The gate consumes exactly two trees, and evaluates them freshly:
+The gate consumes exactly three trees, and evaluates them freshly:
 
 ```text
+artifacts/agent-baseline/captures/**      immutable per-call records, written at capture time
 artifacts/agent-baseline/transcripts/**   frozen real-model transcripts
 artifacts/agent-baseline/reviews/**       blinded human reviews, filed after the freeze
 ```
+
+The captures tree was added 2026-08-27 with `PROVENANCE-001`. Without it the
+gate's own real-model invariant was satisfied by a word typed into a transcript,
+which is the difference between a certified baseline and a plausible file.
 
 Run them through the deterministic evaluator that `EVAL-AGENT-001` already
 implements — `ecu_recovery.evaluation.agent`. Nothing new is built here:
@@ -47,12 +52,17 @@ reviewed real baseline. Each is therefore checked:
    `tests/evaluation/agent/transcripts/**`. That corpus is the scorer's own
    test fixture set and exists to prove the detector finds planted defects.
 2. **Authored or scripted fixtures are forbidden as gate evidence.** Every
-   transcript scored here carries `provenance: model`.
+   transcript scored here carries `provenance: model` **and** a capture record
+   that verifies. The label alone is not evidence; before `PROVENANCE-001` it
+   was accepted as such, and a hand-written transcript could satisfy this line.
 3. **All eight baseline fixtures are present.** A subset is not the corpus, and
    a missing fixture is a failure, not a smaller run.
-4. **Run provenance is real-model.** `AgentEvaluationRun.provenance.kind ==
-   "model"`, so `baseline_only` is False. The evaluator already refuses to
-   report `sufficient_for_gate_agent_mvp` otherwise.
+4. **Run provenance is real-model, and derived from the capture records.**
+   `AgentEvaluationRun.provenance.kind == "model"`, so `baseline_only` is False.
+   Since `PROVENANCE-001` that kind is reached only when every transcript names
+   a capture record that exists, recomputes its own content-derived id, names
+   that transcript, and matches its call record field for field. One transcript
+   that cannot be linked makes the whole run authored, with the reason stated.
 5. **Human semantic measurements have field-level human quorum.** Two distinct
    human reviewers per field, as `Verdict.human_quorum` already requires.
    Authored labels do not count; `adjudicators` must be `human` throughout.
@@ -113,6 +123,10 @@ Publish, in the structured handoff:
 - the **exact frozen model identifier(s) being certified**, read from the
   transcripts and the run's `provenance.detail` rather than retyped. A gate
   result that does not name what it certified certifies nothing;
+- the **provider-issued response id of every certified call**, read from the
+  capture records. These are the identifiers a human can check against the
+  provider's own account records, and they are what makes the certification
+  auditable from outside this repository rather than only consistent within it;
 - **review coverage and any disagreements**, left explicit;
 - the five threshold checks with observed values, and any `UNMEASURED` with its
   reason.
