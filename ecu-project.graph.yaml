@@ -486,7 +486,7 @@ nodes:
     # paths and may run concurrently.
     depends_on:
       - EVAL-AGENT-001
-    status: PENDING
+    status: PASSED
     worker: coding-agent
     prompt: prompts/PROVENANCE-001.md
     # Files, not trees. A repair owning `src/ecu_recovery/agent/**` could
@@ -514,7 +514,35 @@ nodes:
       commands:
         - uv run pytest
     retry_budget: 2
-    note: The gate stops trusting a word in a file and starts checking a record.
+    # Verified 2026-08-28 against merged main, authorized by #41 and implemented
+    # by #42. Every property was re-checked from live behaviour rather than read
+    # back from the implementation report.
+    #
+    # The call record survives serialization complete - provider, requested and
+    # returned identifier, whether the API confirmed it, response id, status,
+    # incomplete reason, truncation, the output ceiling in force, usage with
+    # reasoning tokens, and digests of request and reply. Nothing outside that
+    # named set gets in: metadata carrying api_key, authorization, organization
+    # and headers was copied field by field and none of it, nor the credential
+    # value, appears anywhere in the serialized investigation.
+    #
+    # Captures are content-addressed; changing subject, sample, transcript id,
+    # run id or capture time each changes the identifier. Linkage is verified
+    # across all four bindings - transcript id, sample, subject, and the call
+    # record field for field - and a missing, edited, or swapped record fails
+    # with a stated reason rather than silently.
+    #
+    # The forgery that opened this node is refused: a transcript saying
+    # "provenance": "model" with no capture record yields kind=authored,
+    # is_real_model=False, baseline_only=True. A transport failure still records
+    # the provider, the ceiling, and the request digest, so a lost sample is
+    # auditable rather than blank.
+    #
+    # Nothing else moved. GATE_TARGETS is asserted unchanged, and the recorded
+    # authored-corpus results and report reproduce byte for byte - the control
+    # this node was given, and one it could not have faked, because
+    # artifacts/evals/agent/** was deliberately outside its ownership.
+    note: Verified after PR #42; a claim of model provenance is now checked against an artifact.
 
   BASELINE-AGENT-001:
     title: First real-model baseline transcripts
