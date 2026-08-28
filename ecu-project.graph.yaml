@@ -435,7 +435,7 @@ nodes:
     # never the same incident.
     depends_on:
       - EVAL-AGENT-001
-    status: PENDING
+    status: PASSED
     worker: coding-agent
     prompt: prompts/PROVIDER-001.md
     # Its own tree, deliberately outside src/ecu_recovery/agent/**. AGENT-001
@@ -459,7 +459,38 @@ nodes:
       commands:
         - uv run pytest
     retry_budget: 2
-    note: One completion request in, text out. No tools, no streaming, no storage.
+    # Verified after PR #35 and the repair in PR #36. The adapter is transport
+    # and nothing else: the SDK is imported inside the call that needs it, so
+    # the package imports and the suite stays green with no extra and no key -
+    # a test blocks the import and re-imports to prove the deferral is real
+    # rather than an accident of this host.
+    #
+    # Retries are off. The official client retries twice by default, so silence
+    # on the subject would have sent three outbound requests while a transcript
+    # recorded one, making a capture the best of several tries under the label
+    # of a single attempt. max_retries=0 is forced onto injected clients too.
+    #
+    # The identifier written into a response is the one the API reports, not
+    # the one requested, because an alias resolves server-side and what
+    # answered is what gets certified. No model name is defaulted anywhere.
+    #
+    # PR #36 separated an exhausted output budget from a provider fault: on a
+    # reasoning model max_output_tokens covers reasoning as well as visible
+    # output, so an empty reply can mean a ceiling set too low rather than a
+    # broken connection. The ceiling itself belongs to AGENT-001.
+    #
+    # The lock is part of the chain and closed separately, in that order because
+    # a node does not widen its own ownership: #39 authorized uv.lock under this
+    # node, #40 then wrote the entry. Without it `uv sync --extra openai`
+    # refreshed the lock instead of installing from it, which would have handed
+    # whoever runs the capture an unexpected lockfile diff inside a commit whose
+    # whole purpose is a frozen artifact. `uv sync --extra openai --frozen` now
+    # installs from the committed lock.
+    #
+    # What this node is not: it does not capture, freeze, or score anything, and
+    # nothing here proves a transcript came from it. That is PROVENANCE-001,
+    # which passed separately and is the other prerequisite of the baseline.
+    note: Verified after #35, #36, #39 and #40; transport only, one attempt, no key on disk.
 
   PROVENANCE-001:
     title: Verifiable capture provenance
