@@ -604,7 +604,7 @@ nodes:
     # in a new place, exactly what #42 closed.
     depends_on:
       - PROVENANCE-001
-    status: PENDING
+    status: PASSED
     worker: coding-agent
     prompt: prompts/DETECTION-SCOPE-001.md
     # Files, not trees, and one file per reason: scope is decided in scoring.py,
@@ -633,7 +633,37 @@ nodes:
       commands:
         - uv run pytest
     retry_budget: 2
-    note: A status over zero checks is not a status. Scope is derived, never self-declared.
+    # Verified 2026-08-28 against merged main, authorized by #44 and implemented
+    # by #45. Every property re-checked from live behaviour rather than read back
+    # from the implementation report.
+    #
+    # A verified capture with no expectations reports NOT_APPLICABLE with no
+    # mismatch, where it previously reported FAIL over a genuine sample
+    # described as a defective fixture.
+    #
+    # Authored behaviour is unchanged, and stronger than promised: scoring.py
+    # does not appear in the diff at all. A fixture declaring nothing is still a
+    # fixture bug, a wrong declared vector still fails, an incomplete one still
+    # fails, and a clean one still passes. The detector was not altered; it is
+    # asked about fewer transcripts.
+    #
+    # Scope derives from verified capture linkage alone. A forged
+    # "provenance": "model" with no capture record stays in scope and is still
+    # flagged, as do transcripts whose record is missing, edited, or swapped
+    # with another's. Linkage is computed once and shared with provenance, so a
+    # transcript cannot be a capture for one purpose and a fixture for the
+    # other.
+    #
+    # The third state is explicit rather than conventional: DetectionStatus
+    # consults scope before mismatches, and an unstated scope reports
+    # NOT_APPLICABLE rather than inheriting a pass. The serialized field stays a
+    # boolean and null where there is no answer - the falsy direction, so a
+    # consumer testing it carelessly reads an unverified run as unverified.
+    #
+    # The committed authored results and report are byte-identical, the control
+    # this node was given and could not fake: artifacts/evals/agent/** is not in
+    # its ownership. Five files changed, none outside the allowed paths.
+    note: Verified after PR #45; a status over zero checks is not a status.
 
   BASELINE-AGENT-001:
     title: First real-model baseline transcripts

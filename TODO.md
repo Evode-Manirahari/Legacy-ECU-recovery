@@ -34,8 +34,8 @@ uv run ecu-recovery graph ready
 | `EVAL-AGENT-001` | PASSED | verified after PR #32; the evaluator is complete, a model baseline is not |
 | `PROVIDER-001` | PASSED | verified after #35, #36, #39 and #40; transport only, one attempt, no key on disk |
 | `PROVENANCE-001` | PASSED | verified after PR #42; a claim of model provenance is checked against a capture record |
-| `DETECTION-SCOPE-001` | PENDING | **READY** — repair; a real capture would print a detector failure over its own samples |
-| `BASELINE-AGENT-001` | PENDING | waits on `DETECTION-SCOPE-001`; no real-model transcripts exist yet |
+| `DETECTION-SCOPE-001` | PASSED | verified after PR #45; detector verification has a scope and a third answer |
+| `BASELINE-AGENT-001` | PENDING | **READY** — all three prerequisites passed; no real-model transcripts exist yet |
 | `REVIEW-AGENT-BASELINE-001` | PENDING | human gate; no blinded reviews exist |
 | `GATE-AGENT-MVP` | PENDING | waits on `REVIEW-AGENT-BASELINE-001` |
 
@@ -66,32 +66,46 @@ SPEC-001 → REPO-001 → GRAPH-001 ─┬─→ DATA-001 ─→ GHIDRA-001 ─�
 nothing else: no capture, no scoring, no tools, no streaming, no storage. The
 suite still runs green with no key and no extra installed.
 
-`PROVENANCE-001` has passed too. One repair stands between here and the capture:
+`PROVENANCE-001` and `DETECTION-SCOPE-001` have passed too, so
+`BASELINE-AGENT-001` is `READY` — the first node in this project that spends
+money and leaves the machine.
 
 ```text
 PROVIDER-001         PASSED   transport          ┐
 PROVENANCE-001       PASSED   proof of capture   ├─>  BASELINE-AGENT-001 ─> REVIEW-AGENT-BASELINE-001 ─> GATE-AGENT-MVP
-DETECTION-SCOPE-001  PENDING  scope of a status  ┘       first real calls           human gate              verification
+DETECTION-SCOPE-001  PASSED   scope of a status  ┘          READY                  human gate              verification
 ```
 
-`DETECTION-SCOPE-001` was added 2026-08-28, before the eight real calls rather
-than after them. `verify_detection` reports a mismatch for any transcript with
-no `expects` block, which is right for a fixture and wrong for a capture:
-nothing is planted in a real call, so all eight baseline transcripts trip it and
-the artifact certifying the baseline reads `detector_verification=FAIL` over a
-list of genuine samples described as defective fixtures.
+Three prerequisites belong to whoever starts the capture, not to the code:
 
-It fails no gate invariant, which is the reason to fix it first. A false FAIL
+1. `OPENAI_API_KEY` exported. The adapter reads it from nowhere else.
+2. `OPENAI_MODEL` set to an identifier the API actually reports. Nothing is
+   defaulted; a snapshot name is never invented. What answered is recorded from
+   the response rather than from the request.
+3. The output budget understood. `max_output_tokens` bounds reasoning as well
+   as visible output, so a ceiling set for the size of a JSON reply can be
+   spent entirely on thinking and return nothing.
+
+`DETECTION-SCOPE-001` passed 2026-08-28, before the eight real calls rather than
+after them. `verify_detection` reported a mismatch for any transcript with no
+`expects` block, which is right for a fixture and wrong for a capture: nothing
+is planted in a real call, so all eight baseline transcripts would have tripped
+it and the artifact certifying the baseline would have read
+`detector_verification=FAIL` over a list of genuine samples described as
+defective fixtures.
+
+It failed no gate invariant, which was the reason to fix it first. A false FAIL
 beside real PASSes teaches whoever reads the baseline that the line means
 nothing — and that line is how a real detector regression would announce itself.
-`BASELINE-AGENT-001` freezes what it captures, so repairing this afterwards
-would mean re-scoring a frozen run to change what its report says.
+`BASELINE-AGENT-001` freezes what it captures, so repairing it afterwards would
+have meant re-scoring a frozen run to change what its report says.
 
-The other half is that a corpus with nothing planted cannot be detector-verified
-at all, so `PASS` there would be as empty a claim as `FAIL`. Scope is derived
-from verified capture linkage, never from a transcript's own provenance string:
-an exemption a transcript could declare for itself would hand back, in a new
-place, exactly what `PROVENANCE-001` closed.
+Letting the line read `PASS` instead would have been worse: a corpus with
+nothing planted has not been detector-verified at all, so `PASS` there is as
+empty a claim as `FAIL`. Detector verification now has three answers, and scope
+is derived from verified capture linkage rather than from a transcript's own
+provenance string — an exemption a transcript could declare for itself would
+hand back, in a new place, exactly what `PROVENANCE-001` closed.
 
 Three prerequisites belong to whoever starts the capture, not to the code:
 
@@ -136,8 +150,6 @@ quorum. A coding agent may prepare review material and may never file a review.
 
 ## NEXT
 
-- `DETECTION-SCOPE-001` — detector verification applies to fixtures, and a
-  corpus with nothing planted reports no status rather than a passing one.
 - `BASELINE-AGENT-001` — all eight fixtures, no hand-picked subset, each
   transcript frozen at capture and referencing the capture record written when
   the call was made. Poor answers committed alongside good ones.
