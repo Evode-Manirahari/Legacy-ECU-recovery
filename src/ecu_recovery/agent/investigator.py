@@ -29,6 +29,8 @@ transcript.
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from ..models import Certainty, Evidence, EvidenceKind, Hypothesis
 from ..tools import REGISTRY, ToolContext, ToolRegistry
 from .gathering import gather_facts
@@ -39,6 +41,7 @@ from .models import (
     FactSheet,
     Investigation,
     InvestigationBudget,
+    ModelCall,
     SupportLevel,
     canonical_digest,
 )
@@ -124,32 +127,49 @@ def investigate(
     provider = provider or UnconfiguredProvider()
     sheet = gather_facts(context, subject, budget, registry)
 
+    # Built before the call rather than inside it, so a failure can still record
+    # the ceiling that was in force. A sample lost to a timeout should say what
+    # was attempted; the alternative is a blank nobody can audit afterwards.
+    request = build_request(sheet, budget)
+    provider_name = getattr(provider, "name", "unknown")
+
     try:
-        response = provider.complete(build_request(sheet, budget))
+        response = provider.complete(request)
     except ModelUnavailableError as error:
+        failure = f"model unavailable: {error}"
         return Investigation(
             subject=subject,
             fact_sheet=sheet,
-            model_provider=getattr(provider, "name", "unknown"),
-            failure=f"model unavailable: {error}",
+            model_provider=provider_name,
+            model_call=ModelCall.from_failure(provider_name, request, failure),
+            failure=failure,
         )
     except Exception as error:  # noqa: BLE001 - a provider fault must not crash a run
+        failure = f"provider raised {type(error).__name__}: {error}"
         return Investigation(
             subject=subject,
             fact_sheet=sheet,
-            model_provider=getattr(provider, "name", "unknown"),
-            failure=f"provider raised {type(error).__name__}: {error}",
+            model_provider=provider_name,
+            model_call=ModelCall.from_failure(provider_name, request, failure),
+            failure=failure,
         )
+
+    call = ModelCall.from_response(response, request)
 
     try:
         claims = parse_claims(response.text, subject, budget)
     except ReplyFormatError as error:
+        failure = f"unusable reply: {error}"
         return Investigation(
             subject=subject,
             fact_sheet=sheet,
             model_provider=response.provider,
             model_name=response.model,
-            failure=f"unusable reply: {error}",
+            # A reply that arrived and could not be used is still a real call.
+            # The record says what answered; `failure` says what was wrong with
+            # the answer, and conflating the two would lose a real sample.
+            model_call=replace(call, failure=failure),
+            failure=failure,
         )
 
     checks: list[CitationCheck] = []
@@ -191,6 +211,7 @@ def investigate(
         demotions=tuple(demotions),
         model_provider=response.provider,
         model_name=response.model,
+        model_call=call,
     )
 
 

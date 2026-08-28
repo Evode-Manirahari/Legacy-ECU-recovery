@@ -35,11 +35,23 @@ class Transcript:
     subject: str
     scenario: str
     investigation: dict[str, Any]
+    #: What the file says it is. A claim, not a finding: `runner` checks a claim
+    #: of `model` against a capture record before any run is called one, because
+    #: this field alone was once enough to have a hand-written transcript
+    #: reported as a real-model baseline.
     provenance: str = "authored"
+    #: The capture record attesting this transcript, where one exists. Empty on
+    #: the authored fixtures, which are honest about being scripted.
+    capture_id: str = ""
     #: What this fixture deliberately plants, so the scorer can be checked
     #: against it. A detector that never meets a defect proves nothing, and one
     #: that meets a defect it was not told about proves nothing either.
     expects: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def claims_model(self) -> bool:
+        """Whether this transcript asserts it came from a real provider."""
+        return self.provenance == "model"
 
     @property
     def parsed(self) -> bool:
@@ -66,6 +78,7 @@ class Transcript:
             "subject": self.subject,
             "scenario": self.scenario,
             "provenance": self.provenance,
+            "capture_id": self.capture_id,
             "expects": dict(self.expects),
             "investigation": self.investigation,
         }
@@ -88,6 +101,7 @@ def parse_transcript(payload: dict[str, Any]) -> Transcript:
         scenario=str(payload["scenario"]),
         investigation=investigation,
         provenance=str(payload.get("provenance", "authored")),
+        capture_id=str(payload.get("capture_id", "")),
         expects=dict(payload.get("expects", {})),
     )
 

@@ -49,12 +49,22 @@ class ScriptedProvider:
     model: str = "double"
     raises: Exception | None = None
     requests: list[ModelRequest] = field(default_factory=list)
+    #: What a real transport returns beside the text. Empty by default, so every
+    #: test written before the call record existed behaves exactly as it did.
+    metadata: dict[str, object] = field(default_factory=dict)
+    truncated: bool = False
 
     def complete(self, request: ModelRequest) -> ModelResponse:
         self.requests.append(request)
         if self.raises is not None:
             raise self.raises
-        return ModelResponse(text=self.reply, provider=self.name, model=self.model)
+        return ModelResponse(
+            text=self.reply,
+            provider=self.name,
+            model=self.model,
+            truncated=self.truncated,
+            metadata=dict(self.metadata),
+        )
 
 
 def unavailable_provider() -> ScriptedProvider:
