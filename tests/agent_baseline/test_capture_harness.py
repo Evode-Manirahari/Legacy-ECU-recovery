@@ -45,16 +45,41 @@ from ecu_recovery.evaluation.agent.captures import load_capture, verify_linkage
 from ecu_recovery.evaluation.agent.transcripts import parse_transcript
 
 
+def frozen_manifest(tmp_path: Path) -> tuple[dict[str, str], Path, str]:
+    """A manifest of this test run's subjects, frozen the way a real one is.
+
+    The harness compares what it is about to capture against a manifest on
+    disk, so a test that wants a capture to happen has to freeze one first.
+    That is the same sequence a person follows, which is why the tests do not
+    get a shortcut around it.
+    """
+    subjects = subjects_for(dataset_samples())
+    path = tmp_path / "subject-manifest.json"
+    return subjects, path, write_subject_manifest(path, subjects)
+
+
 def run(tmp_path: Path, provider: RecordingProvider) -> tuple[Any, ...]:
+    subjects, manifest_path, identity = frozen_manifest(tmp_path)
     return capture_all(
-        subjects=subjects_for(dataset_samples()),
+        subjects=subjects,
         provider=provider,
         session_for=fake_session,
         run_id="baseline-test",
         captured_at="2026-08-28T00:00:00Z",
         transcripts_dir=tmp_path / "transcripts",
         captures_dir=tmp_path / "captures",
+        manifest_path=manifest_path,
+        expected_manifest_id=identity,
     )
+
+
+def _artifact_state(tmp_path: Path) -> dict[str, str]:
+    """Every frozen byte under this run, so a test can prove nothing moved."""
+    return {
+        f"{directory}/{path.name}": path.read_text(encoding="utf-8")
+        for directory in ("transcripts", "captures")
+        for path in sorted((tmp_path / directory).glob("*.json"))
+    }
 
 
 def transcripts_of(tmp_path: Path) -> list[dict[str, Any]]:
@@ -315,21 +340,41 @@ def test_the_returned_identity_and_response_id_are_frozen(tmp_path: Path) -> Non
 
 
 def test_a_second_capture_over_the_same_directory_is_refused(tmp_path: Path) -> None:
+    """Refused before the first call, not partway through the first fixture.
+
+    This used to be refused by `freeze_transcript`, which meant one live call
+    had already been paid for and one orphan capture already written before
+    anything objected. The refusal now happens in the preflight, so the second
+    invocation costs nothing.
+    """
     run(tmp_path, RecordingProvider())
+    before = _artifact_state(tmp_path)
 
-    with pytest.raises(BaselinePreparationError, match="never overwritten"):
-        run(tmp_path, RecordingProvider(outcomes={0: "not json"}))
+    second = RecordingProvider(outcomes={0: "not json"})
+    with pytest.raises(BaselinePreparationError, match="already stands here"):
+        run(tmp_path, second)
+
+    assert second.calls == 0
+    assert _artifact_state(tmp_path) == before
 
 
-def test_an_identical_rerun_changes_nothing(tmp_path: Path) -> None:
-    """Rewriting the same bytes is harmless; it is a different run that is not."""
+def test_an_identical_rerun_is_refused_rather_than_repeated(tmp_path: Path) -> None:
+    """Even a rerun that would rewrite identical bytes does not call again.
+
+    The harness used to treat this as a harmless no-op, and rewriting the same
+    bytes is indeed harmless - but only *after* eight more live calls have been
+    made to discover that the bytes match. Nothing distinguishes that from a
+    real second baseline until the money is spent, so any prior state aborts.
+    """
     run(tmp_path, RecordingProvider())
-    before = {p.name: p.read_text(encoding="utf-8") for p in (tmp_path / "transcripts").glob("*")}
+    before = _artifact_state(tmp_path)
 
-    run(tmp_path, RecordingProvider())
+    again = RecordingProvider()
+    with pytest.raises(BaselinePreparationError, match="already stands here"):
+        run(tmp_path, again)
 
-    after = {p.name: p.read_text(encoding="utf-8") for p in (tmp_path / "transcripts").glob("*")}
-    assert before == after
+    assert again.calls == 0
+    assert _artifact_state(tmp_path) == before
 
 
 # --- nothing leaks ---
