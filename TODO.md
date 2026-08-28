@@ -31,10 +31,10 @@ uv run ecu-recovery graph ready
 | `REPORT-001` | PASSED | verified after PR #23; report distinguishes belief from testing |
 | `GATE-STATIC-MVP` | PASSED | all twelve static MVP properties verified 2026-08-18 |
 | `AGENT-001` | PASSED | verified after PR #29; claims are checked against gathered facts |
-| `EVAL-AGENT-001` | PENDING | **READY** — no agent measurement exists |
-| `PROVIDER-001` | PENDING | **READY** — implementation merged (#35, #36, #37, #40); pass under review in #38 |
+| `EVAL-AGENT-001` | PASSED | verified after PR #32; the evaluator is complete, a model baseline is not |
+| `PROVIDER-001` | PASSED | verified after #35, #36, #39 and #40; transport only, one attempt, no key on disk |
 | `PROVENANCE-001` | PASSED | verified after PR #42; a claim of model provenance is checked against a capture record |
-| `BASELINE-AGENT-001` | PENDING | waits on `PROVIDER-001` alone now; no real-model transcripts exist |
+| `BASELINE-AGENT-001` | PENDING | **READY** — both prerequisites passed; no real-model transcripts exist yet |
 | `REVIEW-AGENT-BASELINE-001` | PENDING | human gate; no blinded reviews exist |
 | `GATE-AGENT-MVP` | PENDING | waits on `REVIEW-AGENT-BASELINE-001` |
 
@@ -59,22 +59,30 @@ SPEC-001 → REPO-001 → GRAPH-001 ─┬─→ DATA-001 ─→ GHIDRA-001 ─�
 `artifacts/**`. Nothing else may create them. Each node's contract is in
 `prompts/<NODE-ID>.md`.
 
-## NOW — the measurement exists, the measurement subject does not
+## NOW — the transport exists, nothing has been captured through it
 
-`EVAL-AGENT-001` has passed: the deterministic evaluator is complete and its
-scorer is verified against an adversarial corpus that plants each defect it
-claims to detect.
+`PROVIDER-001` has passed. `ModelRequest -> OpenAI -> ModelResponse`, and
+nothing else: no capture, no scoring, no tools, no streaming, no storage. The
+suite still runs green with no key and no extra installed.
 
-`PROVIDER-001` is `READY`. Three nodes now stand between here and a gate that
-means something:
+`PROVENANCE-001` has passed too, so `BASELINE-AGENT-001` is `READY` — the first
+node in this project that spends money and leaves the machine.
 
 ```text
-PROVENANCE-001 ┐  PASSED
-  proof of capture
-                ├─>  BASELINE-AGENT-001  ->  REVIEW-AGENT-BASELINE-001  ->  GATE-AGENT-MVP
-PROVIDER-001   ┘      experiment               human gate                    verification
-  transport
+PROVIDER-001    PASSED  transport          ┐
+                                           ├─>  BASELINE-AGENT-001 ─> REVIEW-AGENT-BASELINE-001 ─> GATE-AGENT-MVP
+PROVENANCE-001  PASSED  proof of capture   ┘          READY                   human gate              verification
 ```
+
+Three prerequisites belong to whoever starts the capture, not to the code:
+
+1. `OPENAI_API_KEY` exported. The adapter reads it from nowhere else.
+2. `OPENAI_MODEL` set to an identifier the API actually reports. Nothing is
+   defaulted; a snapshot name is never invented. What answered is recorded from
+   the response rather than from the request.
+3. The output budget understood. `max_output_tokens` bounds reasoning as well
+   as visible output, so a ceiling set for the size of a JSON reply can be
+   spent entirely on thinking and return nothing.
 
 `PROVENANCE-001` passed 2026-08-28. It was added the day before, after
 independent review of `PROVIDER-001` found two defects and before any real call
@@ -109,13 +117,9 @@ quorum. A coding agent may prepare review material and may never file a review.
 
 ## NEXT
 
-- `PROVIDER-001` — OpenAI transport behind the existing `ModelProvider`
-  protocol. Key from `OPENAI_API_KEY` only, model name configurable,
-  `store=False`, no tools, no streaming, optional `openai` extra. Suite stays
-  green with nothing installed.
-- `BASELINE-AGENT-001` — all eight fixtures, transcripts frozen at capture,
-  each referencing the capture record written when the call was made, poor
-  answers committed alongside good ones.
+- `BASELINE-AGENT-001` — all eight fixtures, no hand-picked subset, each
+  transcript frozen at capture and referencing the capture record written when
+  the call was made. Poor answers committed alongside good ones.
 - `REVIEW-AGENT-BASELINE-001` — two blinded human reviewers, filing
   independently. Reaches `NEEDS_HUMAN` if they do not exist.
 - `GATE-AGENT-MVP` — verification node, after a reviewed baseline exists.
