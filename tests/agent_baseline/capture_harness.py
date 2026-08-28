@@ -35,8 +35,8 @@ arrives — if at all — from `REVIEW-AGENT-BASELINE-001`, after the freeze.
 
 from __future__ import annotations
 
-import hashlib
 import json
+import re
 from collections.abc import Callable, Iterator
 from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
@@ -44,6 +44,7 @@ from pathlib import Path
 from typing import Any
 
 from ecu_recovery.agent import InvestigationBudget, investigate
+from ecu_recovery.agent.models import canonical_digest
 from ecu_recovery.evaluation.agent.captures import CaptureRecord, record_for, write_capture
 from ecu_recovery.tools import ToolContext
 
@@ -60,17 +61,31 @@ SUBJECT_MANIFEST = BASELINE_ROOT / "results" / "subject-manifest.json"
 TRANSCRIPTS_DIR = BASELINE_ROOT / "transcripts"
 CAPTURES_DIR = BASELINE_ROOT / "captures"
 
-#: The digest of the frozen subject manifest, recorded here rather than beside
-#: the manifest itself. A file carrying its own expected digest attests to
-#: nothing; keeping the two in different trees makes changing what gets captured
-#: a two-file diff a reviewer sees.
+#: Identity of the frozen subject manifest, recorded here rather than beside the
+#: manifest itself. A file carrying its own expected digest attests to nothing;
+#: keeping the two in different trees makes changing what gets captured a
+#: two-file diff a reviewer sees.
 #:
-#: Empty because no subject manifest has been frozen. Four of the eight samples
-#: designate more than one classification function, so "exactly one subject per
-#: fixture" is a choice somebody has to make and defend, not a derivation this
-#: harness may perform on its own. Until that choice is frozen and its digest
-#: recorded here, `load_subject_manifest` refuses and no capture can start.
-SUBJECT_MANIFEST_SHA256 = ""
+#: Empty because no manifest has been frozen into this repository yet. Until a
+#: manifest exists whose identity reproduces a value recorded here,
+#: `load_subject_manifest` refuses and no capture can start.
+SUBJECT_MANIFEST_ID = ""
+
+#: Manifest identity follows the convention already used for captures (`C-`) and
+#: evidence keys (`E-`): a prefix on a digest of the *canonical body*, not of the
+#: file's bytes.
+#:
+#: The distinction is the point. A byte digest changes when somebody reindents
+#: the file or a tool reorders its keys, so it conflates "the frozen subjects
+#: changed" with "the formatting changed" - and the first is the only one worth
+#: refusing a capture over. Canonicalising first means the identifier answers
+#: exactly one question: is this the same manifest content that was agreed?
+MANIFEST_ID_PREFIX = "M-"
+MANIFEST_ID_PATTERN = re.compile(r"^M-[0-9a-f]{64}$")
+
+#: The field holding the identifier. Excluded from what is hashed, because a
+#: value cannot be part of the digest that produces it.
+MANIFEST_ID_FIELD = "manifest_id"
 
 #: The output ceiling for every call in the baseline.
 #:
@@ -104,9 +119,24 @@ class CapturedFixture:
         return self.failure is None
 
 
-def file_digest(path: Path) -> str:
-    """SHA-256 of a file's bytes, for comparing a manifest against its record."""
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+def manifest_body(payload: dict[str, Any]) -> dict[str, Any]:
+    """What the identifier covers: everything the manifest says except the identifier.
+
+    Two layouts are accepted because both are reasonable and the frozen one is
+    whichever a reviewer chose. A manifest nesting its content under `body`
+    hashes that object; a flat manifest hashes itself with the identifier field
+    removed. Either way the field carrying the identifier is outside the digest,
+    since a value cannot be part of the digest that produces it.
+    """
+    nested = payload.get("body")
+    if isinstance(nested, dict):
+        return nested
+    return {name: value for name, value in payload.items() if name != MANIFEST_ID_FIELD}
+
+
+def manifest_id(body: dict[str, Any]) -> str:
+    """The identity of a manifest body, independent of how it was written down."""
+    return MANIFEST_ID_PREFIX + canonical_digest(body)
 
 
 def dataset_samples() -> tuple[str, ...]:
@@ -119,35 +149,47 @@ def dataset_samples() -> tuple[str, ...]:
 
 def load_subject_manifest(
     path: Path = SUBJECT_MANIFEST,
-    expected_digest: str = SUBJECT_MANIFEST_SHA256,
+    expected_id: str = SUBJECT_MANIFEST_ID,
 ) -> dict[str, str]:
     """The frozen subject per fixture, or a refusal naming what is wrong.
 
-    Four things are checked, and every one of them is a way the first baseline
-    could otherwise measure something nobody chose: the manifest exists, its
-    digest matches the value recorded away from it, it covers exactly the
-    dataset's samples, and every subject is a non-empty address.
+    Every check here is a way the first baseline could otherwise measure
+    something nobody chose: the manifest exists, its content reproduces the
+    identity recorded away from it, its own stated identity agrees, it covers
+    exactly the dataset's samples, and every subject is a non-empty address.
     """
-    if not expected_digest:
+    if not expected_id:
         raise BaselinePreparationError(
-            "no subject manifest has been frozen: SUBJECT_MANIFEST_SHA256 is unset. "
-            "Freeze one subject per fixture and record its digest here before capturing."
+            "no subject manifest has been frozen: SUBJECT_MANIFEST_ID is unset. "
+            "Freeze one subject per fixture and record its identity here before capturing."
         )
+    if not MANIFEST_ID_PATTERN.match(expected_id):
+        raise BaselinePreparationError(f"{expected_id!r} is not a manifest identifier")
     if not path.is_file():
         raise BaselinePreparationError(f"no subject manifest at {path}")
 
-    digest = file_digest(path)
-    if digest != expected_digest:
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(manifest, dict):
+        raise BaselinePreparationError("subject manifest is not an object")
+
+    computed = manifest_id(manifest_body(manifest))
+    stated = str(manifest.get(MANIFEST_ID_FIELD, ""))
+    if stated and stated != computed:
         raise BaselinePreparationError(
-            f"subject manifest {path.name} digests {digest}, and {expected_digest} was "
+            f"subject manifest states identity {stated} but its contents give {computed}; "
+            "it was edited after it was written"
+        )
+    if computed != expected_id:
+        raise BaselinePreparationError(
+            f"subject manifest {path.name} has identity {computed}, and {expected_id} was "
             "recorded; it changed after it was frozen, so what would be captured is not "
             "what was agreed"
         )
 
-    manifest = json.loads(path.read_text(encoding="utf-8"))
-    if manifest.get("schema_version") != SUBJECT_MANIFEST_SCHEMA:
+    body = manifest_body(manifest)
+    if body.get("schema_version") != SUBJECT_MANIFEST_SCHEMA:
         raise BaselinePreparationError("unsupported subject manifest schema")
-    subjects = manifest.get("subjects")
+    subjects = body.get("subjects")
     if not isinstance(subjects, dict):
         raise BaselinePreparationError("subject manifest has no subjects object")
 

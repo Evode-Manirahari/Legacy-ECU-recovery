@@ -24,16 +24,20 @@ from baseline_support import (
     RecordingProvider,
     fake_session,
     refusal,
+    subject_manifest_body,
     subjects_for,
     write_subject_manifest,
 )
 from capture_harness import (
     BASELINE_OUTPUT_TOKENS,
-    SUBJECT_MANIFEST_SHA256,
+    MANIFEST_ID_PATTERN,
+    SUBJECT_MANIFEST_ID,
     BaselinePreparationError,
     capture_all,
     dataset_samples,
     load_subject_manifest,
+    manifest_body,
+    manifest_id,
 )
 
 from ecu_recovery.evaluation.agent import evaluate
@@ -415,7 +419,7 @@ def test_no_subject_manifest_is_frozen_yet() -> None:
     so one subject per fixture is a human choice. Until it is made and its
     digest recorded, the capture cannot start.
     """
-    assert SUBJECT_MANIFEST_SHA256 == ""
+    assert SUBJECT_MANIFEST_ID == ""
 
     with pytest.raises(BaselinePreparationError, match="no subject manifest has been frozen"):
         load_subject_manifest()
@@ -423,42 +427,42 @@ def test_no_subject_manifest_is_frozen_yet() -> None:
 
 def test_a_frozen_manifest_loads_when_its_digest_matches(tmp_path: Path) -> None:
     path = tmp_path / "subject-manifest.json"
-    digest = write_subject_manifest(path, subjects_for(dataset_samples()))
+    identity = write_subject_manifest(path, subjects_for(dataset_samples()))
 
-    assert load_subject_manifest(path, digest) == subjects_for(dataset_samples())
+    assert load_subject_manifest(path, identity) == subjects_for(dataset_samples())
 
 
 def test_a_manifest_edited_after_freezing_is_refused(tmp_path: Path) -> None:
     path = tmp_path / "subject-manifest.json"
-    digest = write_subject_manifest(path, subjects_for(dataset_samples()))
+    identity = write_subject_manifest(path, subjects_for(dataset_samples()))
     write_subject_manifest(path, {**subjects_for(dataset_samples()), "lookup_1d_v1": "0xdead"})
 
     with pytest.raises(BaselinePreparationError, match="changed after it was frozen"):
-        load_subject_manifest(path, digest)
+        load_subject_manifest(path, identity)
 
 
 def test_a_manifest_missing_a_fixture_is_refused(tmp_path: Path) -> None:
     subjects = subjects_for(dataset_samples())
     subjects.pop("state_machine_v1")
     path = tmp_path / "subject-manifest.json"
-    digest = write_subject_manifest(path, subjects)
+    identity = write_subject_manifest(path, subjects)
 
     with pytest.raises(BaselinePreparationError, match="missing"):
-        load_subject_manifest(path, digest)
+        load_subject_manifest(path, identity)
 
 
 def test_a_manifest_with_an_empty_subject_is_refused(tmp_path: Path) -> None:
     subjects = {**subjects_for(dataset_samples()), "state_machine_v1": "  "}
     path = tmp_path / "subject-manifest.json"
-    digest = write_subject_manifest(path, subjects)
+    identity = write_subject_manifest(path, subjects)
 
     with pytest.raises(BaselinePreparationError, match="no subject address"):
-        load_subject_manifest(path, digest)
+        load_subject_manifest(path, identity)
 
 
 def test_a_missing_manifest_file_is_refused(tmp_path: Path) -> None:
     with pytest.raises(BaselinePreparationError, match="no subject manifest at"):
-        load_subject_manifest(tmp_path / "absent.json", "0" * 64)
+        load_subject_manifest(tmp_path / "absent.json", "M-" + "0" * 64)
 
 
 def test_the_good_reply_is_what_a_clean_fixture_freezes(tmp_path: Path) -> None:
@@ -468,3 +472,108 @@ def test_the_good_reply_is_what_a_clean_fixture_freezes(tmp_path: Path) -> None:
     payload = transcripts_of(tmp_path)[0]
     assert payload["investigation"]["failure"] is None
     assert json.loads(GOOD_REPLY)["claims"][0]["statement"].startswith("the function")
+
+
+# --- manifest identity is content, not bytes ---
+#
+# The identifier follows the convention captures and evidence keys already use:
+# a prefix on a digest of the canonical body. A byte digest would change when
+# somebody reindents the file or a tool reorders its keys, conflating "the
+# frozen subjects changed" with "the formatting changed". Only the first is
+# worth refusing a capture over.
+
+
+def test_indentation_does_not_change_the_identity(tmp_path: Path) -> None:
+    compact = tmp_path / "compact.json"
+    indented = tmp_path / "indented.json"
+
+    first = write_subject_manifest(compact, subjects_for(dataset_samples()), indent=None)
+    second = write_subject_manifest(indented, subjects_for(dataset_samples()), indent=4)
+
+    assert compact.read_bytes() != indented.read_bytes()
+    assert first == second
+    assert load_subject_manifest(compact, first) == load_subject_manifest(indented, second)
+
+
+def test_key_ordering_does_not_change_the_identity(tmp_path: Path) -> None:
+    sorted_path = tmp_path / "sorted.json"
+    unsorted_path = tmp_path / "unsorted.json"
+
+    first = write_subject_manifest(sorted_path, subjects_for(dataset_samples()), sort_keys=True)
+    second = write_subject_manifest(unsorted_path, subjects_for(dataset_samples()), sort_keys=False)
+
+    assert first == second
+    assert load_subject_manifest(unsorted_path, first) == subjects_for(dataset_samples())
+
+
+def test_a_changed_subject_changes_the_identity(tmp_path: Path) -> None:
+    """The one difference the identifier exists to catch."""
+    original = write_subject_manifest(tmp_path / "a.json", subjects_for(dataset_samples()))
+    moved = write_subject_manifest(
+        tmp_path / "b.json", {**subjects_for(dataset_samples()), "state_machine_v1": "0xdeadbeef"}
+    )
+
+    assert original != moved
+
+
+def test_every_field_of_the_body_is_inside_the_identity() -> None:
+    body = subject_manifest_body(subjects_for(dataset_samples()))
+    baseline = manifest_id(body)
+
+    assert manifest_id({**body, "dataset_id": "something_else"}) != baseline
+    assert manifest_id({**body, "schema_version": 2}) != baseline
+    assert manifest_id({k: v for k, v in body.items() if k != "dataset_id"}) != baseline
+
+
+def test_the_identity_field_is_not_part_of_what_is_hashed() -> None:
+    """A value cannot be part of the digest that produces it."""
+    body = subject_manifest_body(subjects_for(dataset_samples()))
+    identity = manifest_id(body)
+
+    stamped = {**body, "manifest_id": identity}
+    assert manifest_body(stamped) == body
+    assert manifest_id(manifest_body(stamped)) == identity
+
+    relabelled = {**body, "manifest_id": "M-" + "0" * 64}
+    assert manifest_id(manifest_body(relabelled)) == identity
+
+
+def test_a_nested_body_layout_hashes_the_body(tmp_path: Path) -> None:
+    body = subject_manifest_body(subjects_for(dataset_samples()))
+
+    assert manifest_body({"manifest_id": "M-" + "0" * 64, "body": body}) == body
+
+
+def test_a_manifest_whose_stated_identity_lies_is_refused(tmp_path: Path) -> None:
+    path = tmp_path / "subject-manifest.json"
+    identity = write_subject_manifest(path, subjects_for(dataset_samples()))
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["manifest_id"] = "M-" + "1" * 64
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+    with pytest.raises(BaselinePreparationError, match="states identity"):
+        load_subject_manifest(path, identity)
+
+
+def test_a_wrong_expected_identity_is_rejected(tmp_path: Path) -> None:
+    path = tmp_path / "subject-manifest.json"
+    write_subject_manifest(path, subjects_for(dataset_samples()))
+
+    with pytest.raises(BaselinePreparationError, match="changed after it was frozen"):
+        load_subject_manifest(path, "M-" + "a" * 64)
+
+
+def test_an_expected_identity_that_is_not_one_is_refused(tmp_path: Path) -> None:
+    path = tmp_path / "subject-manifest.json"
+    write_subject_manifest(path, subjects_for(dataset_samples()))
+
+    with pytest.raises(BaselinePreparationError, match="not a manifest identifier"):
+        load_subject_manifest(path, "c940a133" + "0" * 56)
+
+
+def test_an_identity_is_prefixed_and_hex() -> None:
+    identity = manifest_id(subject_manifest_body(subjects_for(dataset_samples())))
+
+    assert identity.startswith("M-")
+    assert len(identity) == 66
+    assert MANIFEST_ID_PATTERN.match(identity)

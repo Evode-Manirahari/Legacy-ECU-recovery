@@ -111,15 +111,35 @@ def subjects_for(samples: tuple[str, ...]) -> dict[str, str]:
     return {sample_id: FAKE_SUBJECT for sample_id in samples}
 
 
-def write_subject_manifest(path: Path, subjects: dict[str, str]) -> str:
-    """Freeze a manifest the way a human would, and return its digest."""
-    import hashlib
-
-    path.parent.mkdir(parents=True, exist_ok=True)
-    payload = {
+def subject_manifest_body(subjects: dict[str, str]) -> dict[str, Any]:
+    """The content a manifest identity is computed over."""
+    return {
         "schema_version": 1,
         "dataset_id": "legacy_ecu_synthetic_v1",
         "subjects": dict(sorted(subjects.items())),
     }
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def write_subject_manifest(
+    path: Path,
+    subjects: dict[str, str],
+    indent: int | None = 2,
+    sort_keys: bool = True,
+    stamp_identity: bool = True,
+) -> str:
+    """Freeze a manifest and return its identity.
+
+    The formatting arguments exist so a test can write the same content two
+    different ways and check that the identity does not move. That is the whole
+    reason for canonicalising before hashing.
+    """
+    from capture_harness import manifest_body, manifest_id
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload: dict[str, Any] = dict(subject_manifest_body(subjects))
+    if stamp_identity:
+        payload["manifest_id"] = manifest_id(manifest_body(payload))
+    path.write_text(
+        json.dumps(payload, indent=indent, sort_keys=sort_keys) + "\n", encoding="utf-8"
+    )
+    return manifest_id(manifest_body(payload))
