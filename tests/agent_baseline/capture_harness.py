@@ -36,8 +36,9 @@ arrives — if at all — from `REVIEW-AGENT-BASELINE-001`, after the freeze.
 from __future__ import annotations
 
 import json
+import os
 import re
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Mapping
 from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -46,6 +47,12 @@ from typing import Any
 from ecu_recovery.agent import InvestigationBudget, investigate
 from ecu_recovery.agent.models import canonical_digest
 from ecu_recovery.evaluation.agent.captures import CaptureRecord, record_for, write_capture
+from ecu_recovery.providers.openai import (
+    API_KEY_VARIABLE,
+    MODEL_VARIABLE,
+    OpenAIProvider,
+    provider_from_environment,
+)
 from ecu_recovery.tools import ToolContext
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -244,6 +251,91 @@ def freeze_transcript(directory: Path, payload: dict[str, Any]) -> Path:
     return path
 
 
+def require_provider_configuration(environ: Mapping[str, str] | None = None) -> str:
+    """Refuse to start a live capture that is not configured to make one.
+
+    The failure this prevents is quiet rather than loud. `investigate` records
+    an unreachable provider as an *outcome*, so an unset key does not stop a
+    run - it produces eight transcripts of failures, each labelled
+    `provenance: model`, each backed by a capture record the evaluator verifies,
+    and the whole thing reads to the evaluator as a real baseline against a
+    provider having a very bad day. Configuration is therefore checked before
+    the first call rather than discovered during it.
+
+    Only the model identifier is returned, and only the *names* of missing
+    variables are ever put in the message. The key is checked for presence and
+    then dropped: this function must never be the reason a credential reaches a
+    log, an exception, or a frozen artifact.
+    """
+    env = os.environ if environ is None else environ
+    missing = [
+        name for name in (API_KEY_VARIABLE, MODEL_VARIABLE) if not str(env.get(name, "")).strip()
+    ]
+    if missing:
+        raise BaselinePreparationError(
+            f"the live baseline is not configured: {', '.join(missing)} "
+            f"{'are' if len(missing) > 1 else 'is'} unset or empty. "
+            "No call was made and nothing was written."
+        )
+    return str(env[MODEL_VARIABLE]).strip()
+
+
+def preflight_destinations(transcripts_dir: Path, captures_dir: Path) -> None:
+    """Refuse, before the first call, if a baseline already stands here.
+
+    `freeze_transcript` also refuses to overwrite, but it refuses one fixture at
+    a time and only *after* that fixture's call has been paid for and its
+    capture record written. Rerunning a completed baseline therefore cost one
+    live call and left one orphan capture behind before anything objected.
+
+    Any prior state aborts the whole run: a completed baseline, a partial one
+    from an interrupted attempt, or a single stray record. What to do with what
+    is already there is a decision for a person, and having to make it by hand
+    is the point - an automatic resume is how half of one run and half of
+    another become a single "baseline".
+    """
+    standing = sorted(
+        path.name
+        for directory in (transcripts_dir, captures_dir)
+        if directory.is_dir()
+        for path in directory.glob("*.json")
+    )
+    if standing:
+        raise BaselinePreparationError(
+            f"a baseline already stands here: {len(standing)} file(s) under "
+            f"{transcripts_dir.name}/ and {captures_dir.name}/, first {standing[0]}. "
+            "No call was made and nothing was written. Move or delete the existing "
+            "capture deliberately before running again."
+        )
+
+
+def check_subjects_are_frozen(
+    subjects: dict[str, str],
+    manifest_path: Path = SUBJECT_MANIFEST,
+    expected_manifest_id: str = SUBJECT_MANIFEST_ID,
+) -> None:
+    """The subjects about to be captured must be the ones that were frozen.
+
+    Coverage was already checked - eight fixtures, exactly the dataset's. That
+    says nothing about *where in each binary* the model is pointed, and an
+    address is the easier thing to change: it is one character in a mapping, it
+    breaks no test of coverage, and the resulting run looks in every other
+    respect like the baseline that was agreed.
+
+    So the mapping is compared against `load_subject_manifest` element by
+    element, before the first call. Passing a mapping in at all is a
+    convenience for the tests; the frozen manifest is the authority, and a
+    mapping that disagrees with it by one address does not capture.
+    """
+    frozen = load_subject_manifest(manifest_path, expected_manifest_id)
+    differing = sorted(name for name, subject in frozen.items() if subjects.get(name) != subject)
+    if differing:
+        raise BaselinePreparationError(
+            f"the subjects handed to the capture are not the frozen ones: {differing} "
+            f"differ from {manifest_path.name}. No call was made and nothing was written."
+        )
+
+
 def capture_one(
     sample_id: str,
     subject: str,
@@ -309,18 +401,37 @@ def capture_all(
     captured_at: str,
     transcripts_dir: Path = TRANSCRIPTS_DIR,
     captures_dir: Path = CAPTURES_DIR,
+    manifest_path: Path = SUBJECT_MANIFEST,
+    expected_manifest_id: str = SUBJECT_MANIFEST_ID,
+    environ: Mapping[str, str] | None = None,
 ) -> tuple[CapturedFixture, ...]:
     """Every fixture, once each, in a fixed order.
 
     There is deliberately no fixture argument. A subset parameter is how a
     baseline becomes a selection, and how a poor result becomes a rerun of only
     the fixtures that disappointed.
+
+    Three things are settled before the first call, in this order, because each
+    one is a way a run could otherwise spend money on the wrong measurement:
+    coverage is exactly the dataset's eight, the subjects are exactly the frozen
+    ones, and no baseline already stands in the destination. A live provider is
+    additionally required to be configured. All of them refuse with nothing
+    called and nothing written.
     """
     expected = dataset_samples()
     if tuple(sorted(subjects)) != expected:
         raise BaselinePreparationError(
             f"the baseline covers exactly {len(expected)} fixtures; got {sorted(subjects)}"
         )
+    check_subjects_are_frozen(subjects, manifest_path, expected_manifest_id)
+    if isinstance(provider, OpenAIProvider):
+        # A live transport resolves its credential inside the call, and an
+        # unconfigured one comes back through the declared boundary as an
+        # ordinary failed investigation. Checking here as well as in
+        # `run_live_baseline` means the guarantee belongs to the capture rather
+        # than to the entry point somebody happened to use.
+        require_provider_configuration(environ)
+    preflight_destinations(transcripts_dir, captures_dir)
     return tuple(
         _captured(
             sample_id,
@@ -374,3 +485,45 @@ def ghidra_sessions(sample_id: str) -> Iterator[Any]:
         raise BaselinePreparationError(f"{sample_id}: no stripped firmware at {firmware}")
     with GhidraEngine().analyze_binary(firmware) as session:
         yield session
+
+
+def run_live_baseline(
+    run_id: str,
+    captured_at: str,
+    transcripts_dir: Path = TRANSCRIPTS_DIR,
+    captures_dir: Path = CAPTURES_DIR,
+    session_for: SessionFactory | None = None,
+    environ: Mapping[str, str] | None = None,
+) -> tuple[CapturedFixture, ...]:
+    """The one path that spends money, and the four refusals in front of it.
+
+    Every check happens before a provider is even built, so a run that is going
+    to be refused is refused having called nothing and written nothing:
+
+    1. the credential and the model identifier are configured;
+    2. the subject manifest still has the identity that was frozen;
+    3. the subjects are exactly those subjects;
+    4. no transcript or capture already stands in the destination.
+
+    The model identifier comes from the environment and is never defaulted here
+    - the adapter has no default either, so nothing in this project names a
+    snapshot the API has not been seen to report.
+
+    This function is deliberately not called by anything. `BASELINE-AGENT-001`
+    is a human/spend gate: somebody exports two variables and runs it once.
+    """
+    model = require_provider_configuration(environ)
+    subjects = load_subject_manifest()
+    preflight_destinations(transcripts_dir, captures_dir)
+    return capture_all(
+        subjects=subjects,
+        # The identifier that was just checked is the identifier that is used,
+        # rather than read a second time from somewhere that could disagree.
+        provider=provider_from_environment(model=model),
+        session_for=ghidra_sessions if session_for is None else session_for,
+        run_id=run_id,
+        captured_at=captured_at,
+        transcripts_dir=transcripts_dir,
+        captures_dir=captures_dir,
+        environ=environ,
+    )
