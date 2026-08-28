@@ -694,7 +694,28 @@ nodes:
       # needed: the repair is a readiness check in the harness, and the adapter
       # already raises the right error - just too late to be free.
       - PROVIDER-001
-    status: PENDING
+    # PASSED 2026-08-28, before any real call. `require_transport` attempts the
+    # import the adapter will attempt a moment later and refuses if it cannot -
+    # attempted rather than resolved with find_spec, because a findable-but-
+    # broken install passes the first check and fails the second, which would
+    # put the whole defect back where it was.
+    #
+    # Re-verified on merged main rather than read back from the PR: a missing
+    # SDK, a broken one, and an importable package without the expected symbol
+    # all refuse before fixture iteration, with no provider built, no transcript,
+    # no capture, and a baseline standing elsewhere on disk left byte-identical.
+    #
+    # The refusal names the exception type only. It interpolated the import
+    # error's message at first - arbitrary text from outside the module, landing
+    # in a printed line - which the node's own key-echo regression caught before
+    # merge; `from error` keeps the detail on the traceback instead.
+    #
+    # The check stayed local, as the contract required: no client, no credential
+    # read, no probe request. Verified structurally on the source and again with
+    # sockets disabled. And in the other direction, a provider refusal *during*
+    # capture is still a frozen outcome - eight calls, two failures, sixteen
+    # artifacts, no retry.
+    status: PASSED
     worker: coding-agent
     prompt: prompts/BASELINE-PREFLIGHT-001.md
     # Two files. The check belongs beside the other pre-spend guards in the
@@ -724,7 +745,7 @@ nodes:
         # whose whole purpose is a frozen artifact.
         - git diff --exit-code uv.lock
     retry_budget: 2
-    note: Prove the transport can be reached locally. Do not call the provider to find out.
+    note: Verified after #51 and #52; refused before iteration, nothing called, nothing written.
 
   BASELINE-AGENT-001:
     title: First real-model baseline transcripts
