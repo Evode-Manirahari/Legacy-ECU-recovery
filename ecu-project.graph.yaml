@@ -575,6 +575,66 @@ nodes:
     # artifacts/evals/agent/** was deliberately outside its ownership.
     note: Verified after PR #42; a claim of model provenance is now checked against an artifact.
 
+  DETECTION-SCOPE-001:
+    title: Detector verification scope
+    # A repair node, opened before the first real capture rather than after it.
+    #
+    # `verify_detection` reports "fixture declares no detector expectations" for
+    # any transcript without an `expects` block. Authored fixtures all have one;
+    # captured transcripts never will, because nothing was planted in them. So
+    # every one of the eight baseline transcripts trips it, and the first real
+    # capture prints `detector_verification=FAIL` with the report heading
+    # "Detector disagreed with what the fixtures planted" over a list of genuine
+    # samples described as defective fixtures. Reproduced on a verified-capture
+    # corpus before this node was written.
+    #
+    # It fails no gate invariant. That is what makes it worth fixing now: a
+    # false FAIL beside a real PASS teaches whoever reads the baseline that the
+    # line means nothing, and the same line is how a genuine detector regression
+    # would announce itself.
+    #
+    # The other half is subtler. A corpus with nothing planted cannot be
+    # verified, and reporting PASS over zero checks is the same class of claim
+    # as FAIL over zero checks - a status asserted where nothing was measured.
+    # Both halves are this node.
+    #
+    # Depends on PROVENANCE-001 because scope has to be derived from verified
+    # capture linkage rather than from the transcript's own provenance string.
+    # Exempting a transcript because it calls itself a capture would hand back,
+    # in a new place, exactly what #42 closed.
+    depends_on:
+      - PROVENANCE-001
+    status: PENDING
+    worker: coding-agent
+    prompt: prompts/DETECTION-SCOPE-001.md
+    # Files, not trees, and one file per reason: scope is decided in scoring.py,
+    # applied in runner.py, represented in models.py, and rendered in report.py
+    # and __main__.py. All are EVAL-AGENT-001 slices, and the overlap is the
+    # ordered kind - this node is transitively downstream of it.
+    #
+    # artifacts/evals/agent/** is deliberately absent, exactly as it was for
+    # PROVENANCE-001. The recorded score of the authored corpus is the control:
+    # every fixture there declares its expectations, so scope is universal, the
+    # status stays PASS, and the committed artifacts must not move at all. A
+    # node that could rewrite them could not be held to that.
+    #
+    # captures.py, transcripts.py, gate.py and adjudication.py stay out. This
+    # node reads verified linkage; it does not get to redefine it, and it
+    # touches no threshold and no metric.
+    allowed_paths:
+      - src/ecu_recovery/evaluation/agent/scoring.py
+      - src/ecu_recovery/evaluation/agent/runner.py
+      - src/ecu_recovery/evaluation/agent/models.py
+      - src/ecu_recovery/evaluation/agent/report.py
+      - src/ecu_recovery/evaluation/agent/__main__.py
+      - tests/evaluation/agent/**
+    verification:
+      type: commands
+      commands:
+        - uv run pytest
+    retry_budget: 2
+    note: A status over zero checks is not a status. Scope is derived, never self-declared.
+
   BASELINE-AGENT-001:
     title: First real-model baseline transcripts
     # Experiment execution. Runs the existing agent over all eight fixtures with
@@ -588,6 +648,11 @@ nodes:
       # have to be recaptured to be certifiable - a second round of real calls
       # to fix something that was known beforehand.
       - PROVENANCE-001
+      # Added 2026-08-28. The capture would otherwise print a detector failure
+      # over its own genuine samples, in the artifact that certifies it. Fixing
+      # that afterwards means re-scoring a frozen run to change what its report
+      # says, which is the one thing a frozen run is supposed to prevent.
+      - DETECTION-SCOPE-001
     status: PENDING
     worker: coding-agent
     prompt: prompts/BASELINE-AGENT-001.md
