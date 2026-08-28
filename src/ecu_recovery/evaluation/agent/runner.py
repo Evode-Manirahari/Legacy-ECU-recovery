@@ -18,17 +18,40 @@ from .transcripts import Transcript, load_transcripts
 AUTHORED_DETAIL = "scripted replies over real tool output; no model was called"
 
 
-def _provenance_of(transcripts: tuple[Transcript, ...], captures_dir: Path) -> Provenance:
+def _linkage_of(transcripts: tuple[Transcript, ...], captures_dir: Path) -> dict[str, str]:
+    """Check every claim of model provenance once, and keep why each failed.
+
+    Computed in one place because two questions now depend on it. Provenance
+    asks whether the corpus is a real baseline; detector scope asks whether a
+    given transcript is a captured sample or a fixture. Both must answer from
+    the same verified linkage, or a transcript could be a capture for one
+    purpose and a fixture for the other.
+    """
+    return {
+        transcript.id: verify_linkage(transcript, captures_dir)
+        for transcript in transcripts
+        if transcript.claims_model
+    }
+
+
+def _is_verified_capture(transcript: Transcript, linkage: dict[str, str]) -> bool:
+    """Whether this transcript is a real sample rather than a fixture.
+
+    Derived from the capture record, never from `transcript.provenance`. A
+    transcript that could exempt itself from detector verification by calling
+    itself a capture would hand back, in a new place, what the linkage check
+    exists to prevent: a claim standing in for evidence of the same claim.
+    """
+    return transcript.claims_model and linkage.get(transcript.id, "unchecked") == ""
+
+
+def _provenance_of(transcripts: tuple[Transcript, ...], linkage: dict[str, str]) -> Provenance:
     """Decide what this corpus is, from the capture records rather than the labels."""
     claiming = [transcript for transcript in transcripts if transcript.claims_model]
     if not claiming:
         return Provenance(kind="authored", detail=AUTHORED_DETAIL)
 
-    reasons = tuple(
-        reason
-        for reason in (verify_linkage(transcript, captures_dir) for transcript in claiming)
-        if reason
-    )
+    reasons = tuple(reason for reason in (linkage[item.id] for item in claiming) if reason)
     if reasons:
         return Provenance(
             kind="authored",
@@ -101,18 +124,32 @@ def evaluate(
         role_text = roles.get(role_name) if role_name else None
         scores.append(score_transcript(transcript, role_name, role_text))
 
+    # Detector verification applies to fixtures, not to captured samples. A
+    # fixture declares what it plants so the scorer can be held to finding
+    # exactly that; nothing is planted in a real call, so a captured transcript
+    # has nothing to declare and reporting its silence as a mismatch called
+    # genuine samples defective fixtures. Scope is what changed here - the
+    # check itself is untouched, and an authored fixture with no expectations
+    # is still a fixture bug.
+    linkage = _linkage_of(transcripts, captures_dir)
+    in_scope = tuple(
+        (transcript, score)
+        for transcript, score in zip(transcripts, scores, strict=True)
+        if not _is_verified_capture(transcript, linkage)
+    )
     detection_mismatches = tuple(
         mismatch
-        for transcript, score in zip(transcripts, scores, strict=True)
+        for transcript, score in in_scope
         for mismatch in verify_detection(transcript, score)
     )
     metrics = aggregate(transcripts, tuple(scores), panel)
     return AgentEvaluationRun(
-        provenance=_provenance_of(transcripts, captures_dir),
+        provenance=_provenance_of(transcripts, linkage),
         scores=tuple(scores),
         metrics=metrics,
         gate=check_gate(metrics),
         detection_mismatches=detection_mismatches,
+        detection_in_scope=len(in_scope),
         adversarial=any(transcript.expects for transcript in transcripts),
         adjudicators=panel.kinds,
     )
