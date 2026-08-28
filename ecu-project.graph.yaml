@@ -702,6 +702,17 @@ nodes:
       # makes eight real calls needs a home that is named rather than improvised
       # at capture time.
       - tests/agent_baseline/**
+      # .gitignore, for one line. `artifacts/*` is ignored with named exceptions
+      # for artifacts/evals/ and artifacts/integration/, and there is no
+      # exception for artifacts/agent-baseline/. Every path authorized above is
+      # therefore untrackable: the eight transcripts, their capture records and
+      # the subject manifest would be written, reported as committed, and
+      # silently dropped, leaving a baseline that exists on one machine and
+      # nowhere else. Found while freezing the manifest, before any call was
+      # made. Authorized here rather than taken by the worker, because a node
+      # does not widen its own ownership - and this one may edit exactly the
+      # exception lines that make its own outputs trackable.
+      - .gitignore
     verification:
       type: commands
       commands:
