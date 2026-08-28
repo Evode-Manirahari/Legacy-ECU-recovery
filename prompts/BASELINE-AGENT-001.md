@@ -1,9 +1,33 @@
 # NODE: BASELINE-AGENT-001
 
 **Title:** First real-model baseline transcripts
-**Depends on:** `PROVIDER-001`, `PROVENANCE-001`, `DETECTION-SCOPE-001`
+**Depends on:** `PROVIDER-001`, `PROVENANCE-001`, `DETECTION-SCOPE-001`,
+`BASELINE-PREFLIGHT-001`
 **Verification:** commands
 **Retry budget:** 2
+
+
+## Before this node runs
+
+`BASELINE-PREFLIGHT-001` must be `PASSED`. Configuration being present is not
+the transport being available: with both environment variables set and the
+`openai` extra absent, this node would otherwise freeze eight failure
+transcripts that evaluate as real-model provenance without a single request
+having left the machine.
+
+The canonical live command uses the frozen environment with the extra:
+
+```bash
+uv run --extra openai --frozen ...
+```
+
+`--frozen` on every invocation, and `git diff --exit-code uv.lock` before
+committing. A bare `uv run` has already bumped `openai 3.3.1 -> 3.5.0` once, and
+this is the run whose entire purpose is a frozen artifact.
+
+Once capture begins, a provider or network failure is an **outcome** of the
+experiment - captured, committed, and reported. It is never a reason to retry,
+adapt, or re-run a fixture.
 
 ## Goal
 
