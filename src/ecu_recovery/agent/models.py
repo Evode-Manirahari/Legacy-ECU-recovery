@@ -185,6 +185,161 @@ class Claim:
         }
 
 
+#: Provider metadata copied into a frozen record, named field by field.
+#:
+#: An allowlist rather than a redaction pass, and the difference matters. A
+#: redactor has to recognise a secret in order to remove one, so it protects
+#: against the credential shapes somebody thought of and no others; the next
+#: provider will return a header, an organisation id, or an account slug that no
+#: rule was written for. Copying only named fields cannot leak a field nobody
+#: named.
+_METADATA_FIELDS: tuple[str, ...] = (
+    "requested_model",
+    "returned_model",
+    "model_identity_confirmed",
+    "response_id",
+    "status",
+    "incomplete_reason",
+)
+
+#: Usage counters, likewise named rather than copied. Every value is coerced to
+#: an integer, so a provider returning an object where a number was expected
+#: records nothing instead of an arbitrary repr of whatever it returned.
+_USAGE_FIELDS: tuple[str, ...] = ("input_tokens", "output_tokens", "total_tokens")
+
+#: Nested counters worth keeping. `reasoning_tokens` is the one that decides
+#: whether an empty reply means the model had nothing to say or was still
+#: thinking when the budget ran out.
+_USAGE_DETAILS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("input_tokens_details", ("cached_tokens",)),
+    ("output_tokens_details", ("reasoning_tokens",)),
+)
+
+
+def _int_or_none(value: Any) -> int | None:
+    """An integer, or nothing. `bool` is not an integer here."""
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
+def _usage_of(metadata: dict[str, Any]) -> dict[str, Any]:
+    """The named usage counters, and only those."""
+    raw = metadata.get("usage")
+    if not isinstance(raw, dict):
+        return {}
+    usage: dict[str, Any] = {}
+    for name in _USAGE_FIELDS:
+        value = _int_or_none(raw.get(name))
+        if value is not None:
+            usage[name] = value
+    for group, names in _USAGE_DETAILS:
+        nested = raw.get(group)
+        if not isinstance(nested, dict):
+            continue
+        kept = {name: _int_or_none(nested.get(name)) for name in names}
+        kept = {name: value for name, value in kept.items() if value is not None}
+        if kept:
+            usage[group] = kept
+    return usage
+
+
+@dataclass(frozen=True)
+class ModelCall:
+    """What produced a reply, frozen alongside the reply itself.
+
+    `Investigation` used to record two strings - a provider name and a model
+    name - and the transport had already returned far more than that. Everything
+    else was dropped before anything was written down, so a frozen transcript
+    could not say which snapshot answered, under what output ceiling, whether
+    the reply was cut off, or what the call cost. This record closes that gap and
+    does nothing else.
+
+    Deliberately free of wall-clock time, run identity, and environment. Two
+    identical investigations must serialize identically, because a transcript is
+    compared and re-scored; the things that are true of an occasion rather than
+    of a call belong to the capture record, which is a separate artifact.
+
+    `failure` carries the transport fault when there was one. A lost sample is
+    still evidence: it records what was attempted and under what bound, which is
+    the difference between a gap somebody can audit and a blank.
+    """
+
+    provider: str
+    requested_model: str
+    max_output_tokens: int
+    returned_model: str = ""
+    model_identity_confirmed: bool = False
+    response_id: str = ""
+    status: str = ""
+    incomplete_reason: str = ""
+    truncated: bool = False
+    usage: dict[str, Any] = field(default_factory=dict)
+    request_digest: str = ""
+    reply_digest: str = ""
+    failure: str = ""
+
+    @property
+    def reasoning_tokens(self) -> int | None:
+        """Output-budget spend on reasoning, where the provider reported it."""
+        details = self.usage.get("output_tokens_details")
+        if not isinstance(details, dict):
+            return None
+        return _int_or_none(details.get("reasoning_tokens"))
+
+    @classmethod
+    def from_response(cls, response: Any, request: Any) -> ModelCall:
+        """Build the record from a completed call.
+
+        Typed loosely on purpose: `ModelResponse` and `ModelRequest` live in
+        `provider.py`, which imports nothing from here, and a record of a call
+        should not be the reason the two modules become circular.
+        """
+        metadata = response.metadata if isinstance(response.metadata, dict) else {}
+        kept = {name: metadata.get(name) for name in _METADATA_FIELDS}
+        return cls(
+            provider=str(response.provider),
+            requested_model=str(kept["requested_model"] or ""),
+            max_output_tokens=int(request.max_output_tokens),
+            returned_model=str(kept["returned_model"] or response.model or ""),
+            model_identity_confirmed=bool(kept["model_identity_confirmed"]),
+            response_id=str(kept["response_id"] or ""),
+            status=str(kept["status"] or ""),
+            incomplete_reason=str(kept["incomplete_reason"] or ""),
+            truncated=bool(response.truncated),
+            usage=_usage_of(metadata),
+            request_digest=canonical_digest(request.as_dict()),
+            reply_digest=canonical_digest(response.text),
+        )
+
+    @classmethod
+    def from_failure(cls, provider_name: str, request: Any, failure: str) -> ModelCall:
+        """Build the record for a call that did not return a usable reply."""
+        return cls(
+            provider=provider_name,
+            requested_model="",
+            max_output_tokens=int(request.max_output_tokens),
+            request_digest=canonical_digest(request.as_dict()),
+            failure=failure,
+        )
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "provider": self.provider,
+            "requested_model": self.requested_model,
+            "returned_model": self.returned_model,
+            "model_identity_confirmed": self.model_identity_confirmed,
+            "response_id": self.response_id,
+            "status": self.status,
+            "incomplete_reason": self.incomplete_reason,
+            "truncated": self.truncated,
+            "max_output_tokens": self.max_output_tokens,
+            "usage": dict(self.usage),
+            "reasoning_tokens": self.reasoning_tokens,
+            "request_digest": self.request_digest,
+            "reply_digest": self.reply_digest,
+            "failure": self.failure,
+        }
+
+
 @dataclass(frozen=True)
 class Investigation:
     """One subject, investigated: what was gathered, said, and checked."""
@@ -196,6 +351,10 @@ class Investigation:
     demotions: tuple[str, ...] = ()
     model_provider: str = "unconfigured"
     model_name: str = "unconfigured"
+    #: The whole record of the call, where one was made. `model_provider` and
+    #: `model_name` stay for the readers that already use them; this is what
+    #: they were always two thirds of.
+    model_call: ModelCall | None = None
     failure: str | None = None
 
     @property
@@ -216,6 +375,7 @@ class Investigation:
             "demotions": list(self.demotions),
             "fabricated_citation_count": len(self.fabricated_citations),
             "model": {"provider": self.model_provider, "name": self.model_name},
+            "model_call": None if self.model_call is None else self.model_call.as_dict(),
             "failure": self.failure,
         }
 
