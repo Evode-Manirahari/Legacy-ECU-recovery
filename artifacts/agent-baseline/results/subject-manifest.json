@@ -1,0 +1,17 @@
+{
+  "exclusions": "no function names, semantic roles, expected labels, claims, or answers",
+  "manifest_id": "M-dd677b4a5603966052d08feb7de8e7f01d98a6186044ed7cea4fd93ecacd0248",
+  "schema_version": 1,
+  "selection_rule": "subject is the single function invoked by each fixture's sample_probe",
+  "subjects": {
+    "bitmask_manipulation_v1": "0x100000ee0",
+    "lookup_1d_v1": "0x100000ea0",
+    "lookup_2d_v1": "0x100000ec0",
+    "multi_function_pipeline_v1": "0x100000f00",
+    "rpm_calculation_v1": "0x100000f10",
+    "state_machine_v1": "0x100000ef0",
+    "temperature_controller_v1": "0x100000f40",
+    "timer_counter_v1": "0x100000eb0"
+  },
+  "weighting": "equal: one subject per fixture"
+}

@@ -66,10 +66,27 @@ CAPTURES_DIR = BASELINE_ROOT / "captures"
 #: keeping the two in different trees makes changing what gets captured a
 #: two-file diff a reviewer sees.
 #:
-#: Empty because no manifest has been frozen into this repository yet. Until a
-#: manifest exists whose identity reproduces a value recorded here,
-#: `load_subject_manifest` refuses and no capture can start.
-SUBJECT_MANIFEST_ID = ""
+#: Frozen 2026-08-28, before any model was called and before any transcript
+#: existed. It covers the canonical body of
+#: `artifacts/agent-baseline/results/subject-manifest.json`: the schema version,
+#: the selection rule, the weighting, the exclusion statement, and the eight
+#: fixture-to-address pairs.
+#:
+#: An earlier value, `M-c940a1336f8af121ae6ba26e4a422de67bfaf7466b573dc0f88a666d8352515f`,
+#: was superseded here. Its canonical body could not be reconstructed: 1,981
+#: candidate serializations were tried across every degree of freedom that does
+#: not touch the mapping - field sets, key names, orderings, address
+#: representations, nesting, and rule wordings - and none reproduced it. A digest
+#: whose preimage nobody can state verifies nothing, so it was replaced rather
+#: than worked around.
+#:
+#: What was superseded is the digest, not the decision. The subject mapping is
+#: byte-for-byte the frozen one and was verified independently of it: each
+#: address is the function that fixture's `sample_probe` invokes, resolved from
+#: the unstripped binaries outside this harness, and all eight matched. The
+#: supersession happened before any spend, which is the only time it could have
+#: happened honestly.
+SUBJECT_MANIFEST_ID = "M-dd677b4a5603966052d08feb7de8e7f01d98a6186044ed7cea4fd93ecacd0248"
 
 #: Manifest identity follows the convention already used for captures (`C-`) and
 #: evidence keys (`E-`): a prefix on a digest of the *canonical body*, not of the
