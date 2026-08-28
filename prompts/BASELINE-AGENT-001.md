@@ -18,7 +18,7 @@ verified; this node supplies the subject.
 
 Allowed: `artifacts/agent-baseline/transcripts/**`,
 `artifacts/agent-baseline/captures/**`,
-`artifacts/agent-baseline/results/**`, `tests/agent_baseline/**`.
+`artifacts/agent-baseline/results/**`, `tests/agent_baseline/**`, `.gitignore`.
 
 Deliberately outside `EVAL-AGENT-001`'s artifacts and tests, so a real baseline
 can never be confused with the authored fixtures that verify the scorer.
@@ -29,6 +29,15 @@ separate tree from the transcripts because it answers a different question: a
 transcript is what the model said, a capture record is what the provider did.
 Records are written once and never edited, exactly like the transcripts that
 reference them.
+
+`.gitignore` is authorized for **one line**, and only for the exception that
+makes this node's own outputs trackable. `artifacts/*` is ignored with named
+exceptions for `artifacts/evals/` and `artifacts/integration/`; there is none for
+`artifacts/agent-baseline/`, so every artifact path above is currently
+untrackable. Without the exception the eight transcripts, their capture records
+and the subject manifest would be written, reported as committed, and silently
+dropped — a baseline existing on one machine and nowhere else, discovered after
+the money was spent. Do not use this path for anything else.
 
 `tests/agent_baseline/**` is also where the capture harness lives. This node
 owns no source tree by design — it runs the system rather than changing it — and
