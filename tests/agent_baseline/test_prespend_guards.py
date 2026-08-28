@@ -35,6 +35,7 @@ from capture_harness import (
     require_provider_configuration,
     run_live_baseline,
 )
+from test_transport_preflight import available
 
 from ecu_recovery.evaluation.agent import evaluate
 from ecu_recovery.evaluation.agent.transcripts import TranscriptError
@@ -334,10 +335,17 @@ def test_a_live_provider_handed_straight_to_capture_all_is_refused(tmp_path: Pat
 
 
 def test_a_configured_run_passes_the_check_and_meets_the_next_guard(tmp_path: Path) -> None:
-    """Positive control, stopped one guard short of spending anything.
+    """Positive control, stopped short of spending anything.
 
-    Configuration is valid, so the refusal that arrives is the preflight's —
-    which is the proof that the configuration check let the run through.
+    Configuration is valid and the transport is present, so the refusal that
+    arrives is the destination preflight's — which is the proof that the
+    earlier checks let the run through rather than that they never ran.
+
+    The transport is supplied as a double. `BASELINE-PREFLIGHT-001` added a
+    readiness check between configuration and the destination, and this suite
+    runs on a host with no SDK installed; without the double the refusal here
+    would be the transport's, and the test would no longer be about
+    configuration at all.
     """
     (tmp_path / "captures").mkdir()
     (tmp_path / "captures" / "C-stray.json").write_text("{}", encoding="utf-8")
@@ -350,6 +358,7 @@ def test_a_configured_run_passes_the_check_and_meets_the_next_guard(tmp_path: Pa
             tmp_path / "captures",
             session_for=fake_session,
             environ=CONFIGURED,
+            import_module=available(),
         )
 
 
@@ -363,7 +372,12 @@ def test_the_guards_run_before_the_capture_loop() -> None:
     source = inspect.getsource(capture_all)
     body, _, loop = source.partition("return tuple(")
 
-    for guard in ("check_subjects_are_frozen", "require_provider_configuration", "preflight"):
+    for guard in (
+        "check_subjects_are_frozen",
+        "require_provider_configuration",
+        "require_transport",
+        "preflight",
+    ):
         assert guard in body, f"{guard} must run before the first call"
         assert guard not in loop
 

@@ -35,6 +35,7 @@ arrives — if at all — from `REVIEW-AGENT-BASELINE-001`, after the freeze.
 
 from __future__ import annotations
 
+import importlib
 import json
 import os
 import re
@@ -110,6 +111,16 @@ MANIFEST_ID_PATTERN = re.compile(r"^M-[0-9a-f]{64}$")
 #: The field holding the identifier. Excluded from what is hashed, because a
 #: value cannot be part of the digest that produces it.
 MANIFEST_ID_FIELD = "manifest_id"
+
+#: The transport the live baseline needs present on this machine, and the symbol
+#: the adapter actually reaches for. Named here rather than inlined so the check
+#: and the thing being checked cannot drift apart silently.
+TRANSPORT_MODULE = "openai"
+TRANSPORT_SYMBOL = "OpenAI"
+
+#: How to install it. Put in the refusal, because a refusal that does not say
+#: what to do next is a puzzle rather than a guard.
+TRANSPORT_INSTALL = "uv sync --extra openai --frozen"
 
 #: The output ceiling for every call in the baseline.
 #:
@@ -280,6 +291,54 @@ def require_provider_configuration(environ: Mapping[str, str] | None = None) -> 
     return str(env[MODEL_VARIABLE]).strip()
 
 
+def require_transport(import_module: Callable[[str], Any] | None = None) -> str:
+    """Prove the transport exists on this machine, before anything is spent.
+
+    Configuration being *present* is not the transport being *available*, and
+    the gap between those two is not academic. With both variables set and the
+    extra absent, `_resolve_client` raises `ModelUnavailableError` from inside
+    the call; `investigate` records an unreachable provider as an **outcome**
+    rather than an error; and the run completes with eight transcripts labelled
+    `provenance: model`, eight capture records the evaluator verifies, and
+    `is_real_model=True` - without one request leaving the machine. A complete
+    baseline of nothing, indistinguishable from a real one taken during an
+    outage, and frozen at capture so that finding it afterwards costs a second
+    round of real calls.
+
+    The import is attempted rather than merely resolved. `find_spec` would
+    answer "is it on the path", and the question worth asking is the one the
+    adapter will ask a moment later: does `from openai import OpenAI` work. A
+    findable-but-broken install passes the first and fails the second, which
+    would put the whole defect back exactly where it was.
+
+    **This is a local check and must stay one.** No client is constructed, no
+    credential is read, and nothing is sent. Whether the provider answers, and
+    what it says, is the experiment - not its precondition. Once capture begins
+    a provider or network failure is an outcome to be frozen and reported, never
+    a reason to retry, adapt, or probe first.
+    """
+    load = importlib.import_module if import_module is None else import_module
+    try:
+        module = load(TRANSPORT_MODULE)
+    except Exception as error:  # noqa: BLE001 - any import failure is unreadiness
+        # The exception's *type* only. Its message is arbitrary text from
+        # somewhere this module does not control, and this string is printed;
+        # `from error` keeps the full detail on the traceback for a human
+        # without putting it in a line something might log.
+        raise BaselinePreparationError(
+            f"the {TRANSPORT_MODULE} transport is not importable here "
+            f"({type(error).__name__}). Run `{TRANSPORT_INSTALL}` first. "
+            "No call was made and nothing was written."
+        ) from error
+    if not hasattr(module, TRANSPORT_SYMBOL):
+        raise BaselinePreparationError(
+            f"{TRANSPORT_MODULE} is importable but exposes no {TRANSPORT_SYMBOL}; "
+            f"the installed package is not the transport this expects. "
+            f"Run `{TRANSPORT_INSTALL}`. No call was made and nothing was written."
+        )
+    return str(getattr(module, "__version__", "") or "unknown")
+
+
 def preflight_destinations(transcripts_dir: Path, captures_dir: Path) -> None:
     """Refuse, before the first call, if a baseline already stands here.
 
@@ -404,6 +463,7 @@ def capture_all(
     manifest_path: Path = SUBJECT_MANIFEST,
     expected_manifest_id: str = SUBJECT_MANIFEST_ID,
     environ: Mapping[str, str] | None = None,
+    import_module: Callable[[str], Any] | None = None,
 ) -> tuple[CapturedFixture, ...]:
     """Every fixture, once each, in a fixed order.
 
@@ -415,8 +475,8 @@ def capture_all(
     one is a way a run could otherwise spend money on the wrong measurement:
     coverage is exactly the dataset's eight, the subjects are exactly the frozen
     ones, and no baseline already stands in the destination. A live provider is
-    additionally required to be configured. All of them refuse with nothing
-    called and nothing written.
+    additionally required to be configured and to have its transport importable
+    here. All of them refuse with nothing called and nothing written.
     """
     expected = dataset_samples()
     if tuple(sorted(subjects)) != expected:
@@ -425,12 +485,14 @@ def capture_all(
         )
     check_subjects_are_frozen(subjects, manifest_path, expected_manifest_id)
     if isinstance(provider, OpenAIProvider):
-        # A live transport resolves its credential inside the call, and an
-        # unconfigured one comes back through the declared boundary as an
-        # ordinary failed investigation. Checking here as well as in
+        # A live transport resolves its credential and imports its SDK inside
+        # the call, and both failures come back through the declared boundary as
+        # ordinary failed investigations. Checking here as well as in
         # `run_live_baseline` means the guarantee belongs to the capture rather
-        # than to the entry point somebody happened to use.
+        # than to the entry point somebody happened to use. Neither check runs
+        # for a double: a scripted provider needs no credential and no SDK.
         require_provider_configuration(environ)
+        require_transport(import_module)
     preflight_destinations(transcripts_dir, captures_dir)
     return tuple(
         _captured(
@@ -494,25 +556,43 @@ def run_live_baseline(
     captures_dir: Path = CAPTURES_DIR,
     session_for: SessionFactory | None = None,
     environ: Mapping[str, str] | None = None,
+    import_module: Callable[[str], Any] | None = None,
 ) -> tuple[CapturedFixture, ...]:
-    """The one path that spends money, and the four refusals in front of it.
+    """The one path that spends money, and the five refusals in front of it.
 
     Every check happens before a provider is even built, so a run that is going
     to be refused is refused having called nothing and written nothing:
 
     1. the credential and the model identifier are configured;
-    2. the subject manifest still has the identity that was frozen;
-    3. the subjects are exactly those subjects;
-    4. no transcript or capture already stands in the destination.
+    2. the transport is importable on this machine;
+    3. the subject manifest still has the identity that was frozen;
+    4. the subjects are exactly those subjects;
+    5. no transcript or capture already stands in the destination.
+
+    Checks 1 and 2 are separate because they fail for opposite reasons and only
+    one of them looks like configuration. Both variables can be set correctly on
+    a machine where the SDK was never installed.
 
     The model identifier comes from the environment and is never defaulted here
     - the adapter has no default either, so nothing in this project names a
     snapshot the API has not been seen to report.
 
+    Run it under the frozen environment, with the extra:
+
+        uv run --extra openai --frozen python -c "
+        import sys; sys.path.insert(0, 'tests/agent_baseline')
+        from capture_harness import run_live_baseline
+        run_live_baseline(run_id='...', captured_at='...')"
+
+    `--frozen` every time, and `git diff --exit-code uv.lock` before committing.
+    A bare `uv run` re-resolved and bumped openai 3.3.1 -> 3.5.0 once already,
+    and this is the run whose whole purpose is a frozen artifact.
+
     This function is deliberately not called by anything. `BASELINE-AGENT-001`
     is a human/spend gate: somebody exports two variables and runs it once.
     """
     model = require_provider_configuration(environ)
+    require_transport(import_module)
     subjects = load_subject_manifest()
     preflight_destinations(transcripts_dir, captures_dir)
     return capture_all(
@@ -526,4 +606,5 @@ def run_live_baseline(
         transcripts_dir=transcripts_dir,
         captures_dir=captures_dir,
         environ=environ,
+        import_module=import_module,
     )
