@@ -1,7 +1,7 @@
 # NODE: BASELINE-AGENT-001
 
 **Title:** First real-model baseline transcripts
-**Depends on:** `PROVIDER-001`, `PROVENANCE-001`
+**Depends on:** `PROVIDER-001`, `PROVENANCE-001`, `DETECTION-SCOPE-001`
 **Verification:** commands
 **Retry budget:** 2
 
@@ -79,6 +79,11 @@ artifacts/agent-baseline/results/**          scored by the existing evaluator
 
 The semantic metrics will read UNMEASURED until review lands. That is correct
 and should not be worked around.
+
+Detector verification will read as out of scope rather than as a failure, which
+is `DETECTION-SCOPE-001`'s doing: nothing is planted in a real call, so there is
+nothing for the detector to have found or missed. That is also correct and
+should not be worked around.
 
 ## Acceptance
 
