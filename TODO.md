@@ -35,8 +35,8 @@ uv run ecu-recovery graph ready
 | `PROVIDER-001` | PASSED | verified after #35, #36, #39 and #40; transport only, one attempt, no key on disk |
 | `PROVENANCE-001` | PASSED | verified after PR #42; a claim of model provenance is checked against a capture record |
 | `DETECTION-SCOPE-001` | PASSED | verified after PR #45; detector verification has a scope and a third answer |
-| `BASELINE-PREFLIGHT-001` | PENDING | **READY** — authorized after the pre-spend checklist; a configured run with no `openai` extra freezes eight failure transcripts that evaluate as `model` |
-| `BASELINE-AGENT-001` | PENDING | waits on `BASELINE-PREFLIGHT-001`; no real-model transcripts exist yet |
+| `BASELINE-PREFLIGHT-001` | PASSED | verified after #51 and #52; an absent or broken transport refuses before iteration, with nothing called and nothing written |
+| `BASELINE-AGENT-001` | PENDING | **READY** — all four prerequisites passed; no real-model transcripts exist yet |
 | `REVIEW-AGENT-BASELINE-001` | PENDING | human gate; no blinded reviews exist |
 | `GATE-AGENT-MVP` | PENDING | waits on `REVIEW-AGENT-BASELINE-001` |
 
@@ -67,11 +67,13 @@ SPEC-001 → REPO-001 → GRAPH-001 ─┬─→ DATA-001 ─→ GHIDRA-001 ─�
 nothing else: no capture, no scoring, no tools, no streaming, no storage. The
 suite still runs green with no key and no extra installed.
 
-`PROVENANCE-001` and `DETECTION-SCOPE-001` have passed too. The baseline is
-blocked once more, deliberately, behind `BASELINE-PREFLIGHT-001`.
+`PROVENANCE-001`, `DETECTION-SCOPE-001` and `BASELINE-PREFLIGHT-001` have
+passed too, so `BASELINE-AGENT-001` is `READY` — the first node in this project
+that spends money and leaves the machine.
 
-That node was authorized 2026-08-28 from the pre-spend checklist, which found a
-fourth case walking past all three refusals `#50` had just installed.
+`BASELINE-PREFLIGHT-001` passed 2026-08-28, before any real call. It came out of
+the pre-spend checklist, which found a fourth case walking past all three
+refusals `#50` had just installed.
 Configuration being *present* is not the transport being *available*: with
 `OPENAI_API_KEY` and `OPENAI_MODEL` both set and the `openai` extra absent, the
 configuration guard passes, the SDK import fails inside the call, `investigate`
@@ -87,13 +89,26 @@ costs a second round of real calls.
 
 The repair is local readiness only. No health check, no credential probe, no
 connectivity test: once the eight calls begin, a provider or network failure is
-an **outcome** of the frozen experiment, never a reason to retry or adapt.
+an **outcome** of the frozen experiment, never a reason to retry or adapt. Both
+halves of that boundary are asserted — the check runs with sockets disabled, and
+a run with two provider refusals still freezes all sixteen artifacts and makes
+exactly eight calls.
+
+The import is attempted rather than resolved with `find_spec`. `find_spec`
+answers "is it on the path"; the question worth asking is the one the adapter
+asks a moment later, and a findable-but-broken install passes the first and
+fails the second.
+
+Its own regressions caught a flaw before merge: the refusal interpolated the
+import error's message — arbitrary text from outside the module, landing in a
+printed line. It names the exception type only now, with the detail kept on the
+traceback.
 
 ```text
 PROVIDER-001            PASSED   transport            ┐
 PROVENANCE-001          PASSED   proof of capture     ├─>  BASELINE-AGENT-001 ─> REVIEW-AGENT-BASELINE-001 ─> GATE-AGENT-MVP
-DETECTION-SCOPE-001     PASSED   scope of a status    │       spend gate                human gate              verification
-BASELINE-PREFLIGHT-001  READY    transport is present ┘
+DETECTION-SCOPE-001     PASSED   scope of a status    │        READY                    human gate              verification
+BASELINE-PREFLIGHT-001  PASSED   transport is present ┘      spend gate
 ```
 
 `DETECTION-SCOPE-001` passed 2026-08-28, before the eight real calls rather than
