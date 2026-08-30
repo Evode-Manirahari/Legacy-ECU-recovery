@@ -36,6 +36,7 @@ uv run ecu-recovery graph ready
 | `PROVENANCE-001` | PASSED | verified after PR #42; a claim of model provenance is checked against a capture record |
 | `DETECTION-SCOPE-001` | PASSED | verified after PR #45; detector verification has a scope and a third answer |
 | `BASELINE-PREFLIGHT-001` | PASSED | verified after #51 and #52; an absent or broken transport refuses before iteration, with nothing called and nothing written |
+| `REPOSITION-001` | PENDING | **READY** — the product question changed; documentation still answers the old one |
 | `BASELINE-AGENT-001` | PENDING | **READY** — all four prerequisites passed; no real-model transcripts exist yet |
 | `REVIEW-AGENT-BASELINE-001` | PENDING | human gate; no blinded reviews exist |
 | `GATE-AGENT-MVP` | PENDING | waits on `REVIEW-AGENT-BASELINE-001` |
@@ -177,6 +178,18 @@ Semantic metrics stay UNMEASURED until two blinded reviewers reach field-level
 quorum. A coding agent may prepare review material and may never file a review.
 
 ## NEXT
+
+- `REPOSITION-001` — the product question is now *is this vulnerability actually
+  reachable?*, and the repository still describes an investigation system for
+  undocumented firmware. Authorized 2026-08-29 as a documentation node: it
+  writes the architecture of record, one contract per component, and no code.
+  A system design that arrives through an implementation diff is a design nobody
+  reviewed.
+
+  It runs in parallel with `BASELINE-AGENT-001` — disjoint ownership, no shared
+  file — so the spend gate is not blocked by it and it is not blocked by the
+  spend gate.
+
 
 - `BASELINE-AGENT-001` — all eight fixtures, no hand-picked subset, each
   transcript frozen at capture and referencing the capture record written when
