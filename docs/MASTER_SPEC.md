@@ -8,6 +8,19 @@ version: "1.1"
 
 # Document status
 
+> **Repositioning note (2026-08-29, `REPOSITION-001`).** Sections 1-4 and 53
+> describe the current product: an Automotive Firmware Reachability Engine. The
+> system design of record is `docs/architecture/`.
+>
+> **Sections 8.2, 10, 35 and the phase/victory material still describe the
+> earlier direction** - reconstruction phases, a `reconstruction/` layout entry,
+> and verified-C-reconstruction milestones. They are stale rather than wrong:
+> nothing in them contradicts the reachability architecture, but the roadmap they
+> describe is not the roadmap being followed. Rewriting them is a separate pass
+> and is deliberately not folded into a documentation node that was scoped to the
+> identity sections. This note exists so a reader meets the drift here rather
+> than discovering it in section 35.
+
 **Status:** Ready for execution  
 **Repository authority:** `docs/MASTER_SPEC.md`  
 **Published copy:** `MASTER_SPEC.pdf`  
@@ -17,59 +30,88 @@ version: "1.1"
 
 # 1. Executive summary
 
-The project is an AI-assisted engineering system for understanding legally obtained legacy ECU and embedded firmware when source code, documentation, build systems, or original engineers are missing.
+The project is an **Automotive Firmware Reachability Engine**: a binary-level
+security analysis system that determines which known vulnerabilities in ECU
+firmware are actually reachable from automotive attack surfaces.
 
-The initial product is not an automatic replacement-firmware generator. The first useful product is:
+The product statement:
+
+> A tool that tells automotive security teams which vulnerabilities in their ECU
+> firmware are actually reachable, not just present.
+
+The system:
 
 ```text
-Binary -> static analysis -> evidence-backed understanding -> engineering report
+firmware image
+  -> intake
+  -> components/CVEs -> vulnerable sinks
+     binary analysis -> CFG/dataflow -> attack surface -> automotive sources
+  -> deterministic reachability
+  -> REACHABLE | NOT_REACHABLE | INCONCLUSIVE
+  -> evidence pack
 ```
 
-The later product becomes:
+The engineering principle every component boundary protects:
 
-```text
-Binary
-  -> static analysis
-  -> hypotheses
-  -> controlled experiments
-  -> behavioral understanding
-  -> selected C reconstruction
-  -> behavioral verification
-```
+> **The model can suggest. The analysis engine decides. The evidence proves.**
+
+A language model assists with interpretation, labelling and explanation. It never
+decides reachability, and the architecture makes that testable rather than
+promised: remove every model annotation and the verdicts must not change.
+
+**The system design of record is `docs/architecture/`** — the diagram plus one
+contract per component. Architecture changes are documented before or alongside
+implementation. A system design that arrives through an implementation diff is a
+design nobody reviewed.
 
 The build method is graph engineering:
 
 > **Graph outside. Loops inside. Tests on the edges.**
 
-Global work is controlled by an explicit dependency DAG. Coding agents receive bounded nodes. A node is complete only when its acceptance conditions pass. Local implement-test-debug loops are encouraged inside a node, but an agent must not autonomously move into downstream nodes.
+Global work is controlled by an explicit dependency DAG. Coding agents receive
+bounded nodes. A node is complete only when its acceptance conditions pass. Local
+implement-test-debug loops are encouraged inside a node, but an agent must not
+autonomously move into downstream nodes.
 
 # 2. The problem
 
-Legacy embedded software often outlives the team and infrastructure that created it. A company may still depend on a controller while possessing only some combination of:
+An ECU firmware image contains vendored components - network stacks, parsers,
+crypto libraries, RTOS pieces - and those components carry known CVEs. A software
+composition scanner produces a list. On a real image the list is long.
 
-- a physical ECU or controller;
-- a raw firmware image;
-- partial service documentation;
-- old calibration or diagnostic files;
-- incomplete hardware notes;
-- tribal knowledge from a few engineers.
+The list answers **presence**. The team has to answer something else: which of
+these can an attacker actually reach?
 
-What may be missing:
+Most cannot. A defect in a code path no external input ever drives is not an
+attack. A defect one call from a UDS service handler is. The two are
+indistinguishable in a CVE list and could not be more different in a release
+decision.
 
-- original source code;
-- symbols;
-- build scripts;
-- compiler version;
-- design specification;
-- test suite;
-- hardware abstraction documentation;
-- original developers.
+Today that distinction is drawn by hand: an engineer with Ghidra open, tracing
+whether anything originating at CAN, UDS, DoIP or OTA can reach the vulnerable
+function. The work is slow, repeated per image and per release, and rarely
+finished - so teams ship judgement calls.
 
-Reverse engineers then spend substantial time discovering functions, data structures, state machines, calibration tables, communication routines, control logic, and hardware assumptions manually.
+The project bet:
 
-The project bet is:
+> Deterministic binary analysis can decide reachability from an automotive attack
+> surface to a known vulnerable sink, with evidence a security engineer can
+> check, often enough to change how remediation is prioritised.
 
-> An evidence-driven AI engineering system can automate enough repetitive firmware investigation to reduce expert engineering time while preserving traceability, uncertainty, and human control.
+## 2.1 Why the errors are not symmetrical
+
+Three verdicts, three very different costs.
+
+A wrong `REACHABLE` wastes engineering time, and gets discovered by the engineer
+who investigates it. An `INCONCLUSIVE` is honest about work remaining. A wrong
+`NOT_REACHABLE` tells a security team a live, exploitable defect is safe to
+deprioritise - and nothing downstream is looking for it.
+
+**A false-unreachable is the only error whose cost is paid entirely by somebody
+who trusted the answer.** The engine is therefore built to be unable to say
+`NOT_REACHABLE` without a justification for the absence of a path, it prefers
+`INCONCLUSIVE` when the program representation has a gap between source and sink,
+and a confirmed false-unreachable is a release blocker in the benchmark.
 
 # 3. First product and first customer
 
@@ -78,80 +120,94 @@ The project bet is:
 Input:
 
 ```text
-firmware.bin
+firmware.bin  +  a known vulnerable function  +  an automotive entry point
 ```
 
-Useful early output:
+Output - the **Evidence Pack**, nine fields:
 
-- processor and architecture metadata;
-- memory map;
-- entry points and interrupt candidates;
-- function inventory;
-- call graph;
-- cross references;
-- strings and constants;
-- data/table candidates;
-- calibration candidates;
-- diagnostic and communication candidates;
-- function explanations;
-- C-like pseudocode where useful;
-- evidence for each claim;
-- confidence and uncertainty;
-- contradictions and unresolved questions;
-- generated engineering report.
+- vulnerability / CVE;
+- vulnerable sink;
+- automotive source / entry point;
+- source-to-sink path, or the justified absence of one;
+- CFG and data-flow evidence;
+- binary / disassembly evidence;
+- verification evidence, when verification was performed;
+- unresolved assumptions;
+- the verdict.
 
-The first product does **not** require perfect C reconstruction.
+**No confidence percentage appears on a verdict.** The evidence chain is what
+supports it; a number would invite averaging across findings whose missing pieces
+are not comparable. This does not affect the sidecar's self-reported confidence
+in its own suggestions, which is a property of a suggestion rather than a result.
+
+The first technical goal is deliberately narrower than the product:
+
+> Given one supported ECU firmware image, a known vulnerable function, and an
+> identified automotive entry point, determine deterministically whether a valid
+> path exists from the source to the vulnerable sink, and output the evidence
+> supporting that verdict.
 
 ## 3.2 Early customer categories
 
-Potential early users include:
+The primary user is an automotive product security or vulnerability management
+team - at an OEM, a tier-1 supplier, or a firm assessing on their behalf. Someone
+who already has the CVE list and has to decide what it means.
 
-- ECU remanufacturers;
-- automotive electronics specialists;
-- embedded reverse engineers;
-- engineering consultancies;
-- suppliers maintaining discontinued products;
-- motorsport electronics teams;
-- classic-car electronics specialists;
-- firmware security teams;
-- industrial embedded maintenance teams.
+The preferred discovery question:
 
-The preferred discovery question is:
+> Show me the last firmware release where you had a CVE list and had to decide,
+> by hand, which entries actually mattered.
 
-> Show me the last embedded controller that took you days or weeks to understand.
+Then measure what consumed the time, what evidence convinced them, where they
+gave up and shipped a judgement call, and what they did when they could not tell.
 
-Then measure what consumed time, what evidence they trusted, where uncertainty occurred, and which repetitive steps could be accelerated.
+## 3.3 Secondary use case: legacy ECU recovery
+
+The same components answer a question engineers pay for today: *what does this
+undocumented function actually do?* Legacy embedded software outlives its source,
+symbols, toolchain, tests and original team while the controller still matters.
+
+Call graphs, cross-references, decompilation, hidden ground truth and an
+evidence-first report with explicit `known` / `inferred` / `unknown` distinctions
+serve both questions. Users include ECU remanufacturers, embedded reverse
+engineers, engineering consultancies, suppliers maintaining discontinued
+products, and motorsport and classic-car electronics teams.
+
+This capability is built and is kept. It is a use case, not the identity of the
+product, and the roadmap is not organised around it.
 
 # 4. Scope and non-goals
 
 ## 4.1 Initial scope
 
-Start narrow:
+- one supported ECU firmware image at a time;
+- operator-supplied architecture and load address; nothing is guessed silently;
+- static, deterministic analysis;
+- one known vulnerable sink and one identified automotive entry point;
+- a single reachability verdict with its Evidence Pack.
 
-```text
-one supported CPU architecture
--> one synthetic benchmark family
--> one selected ECU family
--> one authorized real firmware case
-```
+Optional runtime or emulation verification exists for `INCONCLUSIVE` findings and
+on explicit customer request. **It is not on the normal critical path**, and both
+verified and unverified findings produce an Evidence Pack.
 
-Do not start by supporting every architecture or OEM.
+Benchmarking is CI and development infrastructure. It does not appear in the
+runtime architecture.
 
 ## 4.2 Explicit non-goals for the early product
 
-Do not build these before the required gates:
+The system reads firmware and reports reachability with evidence. It does not:
 
-- full vehicle simulation;
-- firmware flashing;
-- live vehicle control;
-- automated tuning;
-- immobilizer bypass;
-- credential or key extraction;
-- arbitrary host execution;
-- perfect whole-firmware source recovery;
-- multi-OEM enterprise infrastructure;
-- a large autonomous agent team;
-- a front end before the analysis primitive is proven.
+- generate, weaponise, or execute exploits;
+- flash, modify, or control vehicles or hardware;
+- certify or guarantee regulatory compliance;
+- reconstruct source code, or produce replacement firmware;
+- decompile an ECU with a language model;
+- automatically detect architecture and present the guess as fact;
+- make emulation a prerequisite for an answer;
+- attach a confidence percentage to a reachability verdict.
+
+Firmware is treated as data and is never executed by the intake path. Only
+firmware the operator is authorised to possess and inspect is analysed.
 
 # 5. Core product principle: testable claims
 
@@ -1943,13 +1999,19 @@ For graph engineering:
 
 # 53. Long-term vision
 
-The long-term product is not simply an "AI decompiler for cars."
+The long-term product is:
 
-It is:
+> An evidence-driven system for deciding, at binary level and with checkable
+> evidence, which vulnerabilities in embedded software an attacker can actually
+> reach.
 
-> An evidence-driven AI engineering environment for recovering understanding from undocumented embedded software.
+Automotive ECUs are the first vertical, and the reachability question is the
+first question. The understanding-recovery capability the earlier direction was
+built around is retained and serves the same components - see section 3.3.
 
-Automotive ECUs are the first vertical.
+It is not an "AI decompiler for cars", and the distinction is not cosmetic: the
+decision is deterministic, the model never makes it, and the deliverable is an
+evidence chain rather than a rendering.
 
 The system should investigate, record what it knows, distinguish inference from fact, design controlled tests, gather evidence, revise incorrect beliefs, reconstruct selected behavior, and verify that reconstruction.
 

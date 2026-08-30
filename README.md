@@ -1,32 +1,121 @@
-# Legacy ECU Recovery
+# Automotive Firmware Reachability Engine
 
-Legacy ECU Recovery is an evidence-first investigation system for undocumented
-automotive firmware. The long-term loop is:
+**A tool that tells automotive security teams which vulnerabilities in their ECU
+firmware are actually reachable, not just present.**
 
-> binary → understanding → reconstruction → behavioral validation
+A firmware image may carry a hundred known CVEs in vendored components. A scanner
+lists all hundred. That answers *presence*, and it is nearly useless to the team
+deciding what to fix before the next release.
 
-The current scope is deliberately smaller: safely inventory a firmware image,
-persist analysis facts and hypotheses, and produce an auditable engineering
-report. Firmware is treated as data and is never executed by the intake path.
+The question that allocates engineering time is whether an attacker can actually
+drive the defect from somewhere they can touch — CAN, UDS, DoIP, OTA. Answering
+it requires a **path** through the binary, from a source an attacker influences
+to the sink where the vulnerability lives.
 
-## Current vertical slice
+Presence is a lookup. Reachability is an analysis, and it either has a path or it
+does not.
 
-- Raw binary intake with SHA-256/SHA-1/MD5 fingerprints, byte entropy, fill-byte
-  statistics, and repeated-block detection.
-- Explicit processor selection; architecture guessing is not presented as fact.
-- SQLite investigation store for functions, evidence, and hypotheses.
-- Markdown engineering report with clear `known`, `inferred`, and `unknown`
-  distinctions.
-- Ghidra static analysis through PyGhidra behind an engine-independent interface:
-  functions, call graph, disassembly, decompilation, cross-references, strings,
-  memory regions, bounded byte reads, and constant search.
-- Six reproducible synthetic firmware fixtures with isolated ground truth,
-  symbols-on/stripped builds, behavior probes, and artifact hashes.
+## Architecture
+
+![Automotive Firmware Reachability Engine architecture](docs/architecture/ecu-reachability-architecture.png)
+
+**[docs/architecture/](docs/architecture/) is the source of truth for system
+design** — the diagram, and one contract per component covering its position,
+responsibility, inputs, outputs, permitted dependencies, and how it is tested.
+
+```text
+firmware image → intake → ┬→ components/CVEs  → vulnerable sinks ─┐
+                          └→ binary analysis  → attack surface  ──┤
+                                                                  ▼
+                          LLM sidecar ─────────────→  reachability engine
+                          (never decides)                         │
+                                                                  ▼
+                                          verdict ──→ verification (optional)
+                                                                  │
+                                                            evidence pack
+```
+
+## The principle
+
+> **The model can suggest. The analysis engine decides. The evidence proves.**
+
+The reachability decision is deterministic. Same firmware, same verdict, every
+time. A language model assists with interpretation, labelling and explanation,
+and is architecturally prevented from deciding anything: remove every model
+annotation and the verdicts must not change.
+
+## Three verdicts
+
+| Verdict | Means | Requires |
+|---|---|---|
+| `REACHABLE` | A path exists from an automotive source to the vulnerable sink | The concrete path, with per-hop evidence |
+| `NOT_REACHABLE` | No path exists | A justification for the *absence* of one |
+| `INCONCLUSIVE` | The analysis could not decide | A specific statement of what blocked it |
+
+There is no fourth bucket, and **no confidence percentage on a verdict.** The
+evidence chain is what supports it; a number beside it would invite readers to
+average across findings whose missing pieces are not comparable.
+
+**The engine prefers `INCONCLUSIVE` to an unjustified `NOT_REACHABLE`.** The
+three errors do not cost the same. A wrong `REACHABLE` wastes time and gets
+discovered. A wrong `NOT_REACHABLE` tells a security team a live defect is safe
+to deprioritise, and nothing downstream is looking for it. A confirmed
+false-unreachable is a **release blocker**.
+
+## The deliverable
+
+An **Evidence Pack**: the CVE, the vulnerable sink, the automotive entry point,
+the source-to-sink path, the CFG and data-flow evidence, the binary evidence,
+verification evidence if it was performed, the unresolved assumptions, and the
+verdict.
+
+A verdict without its evidence is a claim. A security team acting on "not
+reachable" needs to see why.
+
+## Status
+
+The architecture describes the target system. This is what exists today.
+
+| Component | Status |
+|---|---|
+| Intake | **Built** — fingerprints, entropy, fill-byte and repeated-block analysis, explicit processor selection |
+| Binary analysis | **Built for CFG-level facts** — Ghidra via PyGhidra behind an engine-independent interface: functions, call graph, xrefs, decompilation. Data-flow analysis is not built |
+| LLM sidecar | **Built** — bounded investigator whose claims are checked against gathered facts, with content-addressed provenance for every model call |
+| Evidence pack | **Foundations built** — evidence schema and reporting with `known` / `inferred` / `unknown` distinctions |
+| Components/CVEs, attack surface, reachability engine, verdict, verification | **Not built** |
+
+### First technical goal
+
+> Given one supported ECU firmware image, a known vulnerable function, and an
+> identified automotive entry point, determine deterministically whether a valid
+> path exists from the source to the vulnerable sink, and output the evidence
+> supporting that verdict.
+
+Narrow on purpose. Not the whole system.
+
+## What this is not
+
+This system reads firmware and reports reachability with evidence. It does not
+generate or execute exploits, flash or control vehicles, certify regulatory
+compliance, reconstruct source code, or decompile an ECU with a language model.
+
+Only analyse firmware you are authorised to possess and inspect.
+
+## Secondary use case: legacy ECU recovery
+
+The same machinery answers a different question that engineers pay for today:
+*what does this undocumented function actually do?*
+
+Call graphs, cross-references, decompilation, hidden ground truth and an
+evidence-first report are what a reverse engineer needs when a controller
+outlives its source, symbols, toolchain and original team. That capability is
+built and kept — see [PROJECT.md](PROJECT.md#secondary-use-case-legacy-ecu-recovery).
+
+It is a use case, not the product identity.
 
 ## Quick start
 
-Python 3.11 or newer is required. The checked-in `.python-version` selects 3.11
-for tools that support it.
+Python 3.11 or newer. The checked-in `.python-version` selects 3.11.
 
 ```bash
 uv sync --extra dev
@@ -59,17 +148,13 @@ Skip the slow JVM path with `uv run pytest -m "not ghidra"`.
 See [docs/ghidra-integration.md](docs/ghidra-integration.md) for the layering,
 discovery order, response bounds, and what has actually been measured.
 
-`uv.lock` pins the complete development environment. Ruff provides linting and
-formatting, while mypy runs strict static type checks:
+`uv.lock` pins the complete development environment:
 
 ```bash
 uv run ruff check .
 uv run ruff format --check .
 uv run mypy
 ```
-
-The doctor command reports missing Ghidra or PyGhidra as warnings, so the rest of
-the toolchain stays usable without them.
 
 Rebuild and verify the synthetic laboratory:
 
@@ -81,42 +166,50 @@ uv run pytest tests/test_synthetic_lab.py
 See [docs/synthetic-lab.md](docs/synthetic-lab.md) for the visibility boundary,
 architecture rationale, metadata contract, and exact evaluation formulas.
 
-Only analyze firmware you are authorized to possess and inspect. Do not use a
-generated conclusion as a basis for flashing a vehicle or controlling hardware.
-
 ## Project map
 
+The package is named `ecu_recovery` and the repository `Legacy-ECU-recovery`.
+Both names predate this architecture and are kept for now — renaming touches
+every import across work that is already verified. They are historical, not a
+statement of scope.
+
 ```text
-src/ecu_recovery/   core library and CLI
-src/ecu_recovery/binary/  firmware intake public boundary
-src/ecu_recovery/analysis/ deterministic analysis public boundary
-src/ecu_recovery/agent/   reserved agent boundary; no AI integration yet
-src/ecu_recovery/evidence/ evidence model public boundary
-src/ecu_recovery/reports/ reporting public boundary
-src/ecu_recovery/analysis/models.py  engine-free analysis vocabulary
-src/ecu_recovery/analysis/base.py    engine interface, bounds, typed errors
-src/ecu_recovery/analysis/ghidra.py  the only module that touches Java
-docs/               architecture, research decisions, experiments
-samples/synthetic/  known-source firmware laboratory and generated artifacts
-scripts/            reproducible dataset builder
-tests/              automated tests
+docs/architecture/        the architecture of record: diagram + component contracts
+src/ecu_recovery/         core library and CLI
+  binary/                 firmware intake boundary        → Intake
+  analysis/               deterministic analysis boundary → Binary analysis
+    models.py             engine-free analysis vocabulary
+    base.py               engine interface, bounds, typed errors
+    ghidra.py             the only module that touches Java
+  agent/                  bounded investigator            → LLM sidecar
+  providers/openai/       model transport, one attempt, no key on disk
+  evidence/               evidence model boundary         → Evidence pack
+  reports/                reporting boundary              → Evidence pack
+  evaluation/             scoring and gates (development infrastructure)
+samples/synthetic/        known-source firmware laboratory
+scripts/                  reproducible dataset builder
+tests/                    automated tests
 ```
+
+New components are expected to live under a path that names the box they
+implement, so the diagram and the source tree can be read side by side.
 
 ## How this project is built
 
-Development follows the dependency graph in `docs/MASTER_SPEC.md`, which is the
-authoritative engineering specification. Work is executed one bounded node at a
-time, and an edge means the prerequisite was *verified* — not that an agent
-reported done.
+Development follows the dependency graph in
+[docs/MASTER_SPEC.md](docs/MASTER_SPEC.md), the authoritative engineering
+specification. Work is executed one bounded node at a time, and an edge means the
+prerequisite was *verified* — not that an agent reported done.
 
-The current frontier, open decisions, and node status live in
-[TODO.md](TODO.md). What actually exists is in
-[ARCHITECTURE.md](ARCHITECTURE.md); how correctness is measured is in
+**Architecture changes are documented before or alongside implementation.** A
+system design that arrives through an implementation diff is a design nobody
+reviewed. If implementation exposes a real architectural problem, the change is
+proposed — problem, tradeoffs, affected contracts, migration consequence — before
+it is built.
+
+Benchmarking is CI and development infrastructure. It does not appear in the
+runtime architecture. Metrics and the false-unreachable release blocker are in
 [EVALS.md](EVALS.md).
 
-No AI agent is introduced before the static MVP gate passes, because until
-deterministic retrieval is measurable an error cannot be attributed among Ghidra,
-the parser, the tool layer, the context, the model, and the prompt.
-
-See also [docs/architecture.md](docs/architecture.md) and
-[docs/experiments.md](docs/experiments.md).
+The current frontier and node status live in [TODO.md](TODO.md). What actually
+exists is in [ARCHITECTURE.md](ARCHITECTURE.md).

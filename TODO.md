@@ -36,7 +36,7 @@ uv run ecu-recovery graph ready
 | `PROVENANCE-001` | PASSED | verified after PR #42; a claim of model provenance is checked against a capture record |
 | `DETECTION-SCOPE-001` | PASSED | verified after PR #45; detector verification has a scope and a third answer |
 | `BASELINE-PREFLIGHT-001` | PASSED | verified after #51 and #52; an absent or broken transport refuses before iteration, with nothing called and nothing written |
-| `REPOSITION-001` | PENDING | **READY** — the product question changed; documentation still answers the old one |
+| `REPOSITION-001` | PENDING | implemented; architecture of record written, nine component contracts, identity repositioned |
 | `BASELINE-AGENT-001` | PENDING | **READY** — all four prerequisites passed; no real-model transcripts exist yet |
 | `REVIEW-AGENT-BASELINE-001` | PENDING | human gate; no blinded reviews exist |
 | `GATE-AGENT-MVP` | PENDING | waits on `REVIEW-AGENT-BASELINE-001` |
@@ -179,16 +179,26 @@ quorum. A coding agent may prepare review material and may never file a review.
 
 ## NEXT
 
-- `REPOSITION-001` — the product question is now *is this vulnerability actually
-  reachable?*, and the repository still describes an investigation system for
-  undocumented firmware. Authorized 2026-08-29 as a documentation node: it
-  writes the architecture of record, one contract per component, and no code.
-  A system design that arrives through an implementation diff is a design nobody
-  reviewed.
+- `REPOSITION-001` — done, pending status transition. The product question is now
+  *is this vulnerability actually reachable?* `docs/architecture/` is the system
+  design of record: the diagram, plus nine component contracts each answering
+  position, responsibility, inputs, outputs, permitted dependencies and testing
+  in that fixed order.
 
-  It runs in parallel with `BASELINE-AGENT-001` — disjoint ownership, no shared
-  file — so the spend gate is not blocked by it and it is not blocked by the
-  spend gate.
+  It wrote no code, deliberately. Five of the nine components do not exist —
+  CVE-to-sink mapping, attack-surface identification, the reachability engine,
+  the verdict type, and verification — and data-flow analysis is missing from the
+  otherwise built binary-analysis component. Each needs its own node. None of
+  them is closed by documentation.
+
+  It ran in parallel with `BASELINE-AGENT-001` — disjoint ownership, no shared
+  file — so the spend gate was neither blocked by it nor blocking it.
+
+- The first implementation node after this one should be the **MVP slice**, not a
+  component: one firmware image, one known vulnerable sink, one identified
+  automotive entry point, one deterministic verdict, one Evidence Pack. Building
+  the nine components in diagram order would produce five unfinished halves and
+  no answer to the product question.
 
 
 - `BASELINE-AGENT-001` — all eight fixtures, no hand-picked subset, each

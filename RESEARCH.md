@@ -175,3 +175,41 @@ ground-truth metadata.
 **Outcome (2026-08-17):** performed under the deprecated sequence and recorded in
 `EVALS.md` → "Pre-graph static-analysis measurement". The test passed on two of
 six fixtures. It is not a gate result; `EVAL-STATIC-001` has not run.
+
+---
+
+## 2026-08-29 — Repositioning to reachability
+
+**Source:** product direction, recorded in `ADR-005` and `docs/architecture/`.
+
+**Claim:** the answerable question with budget attached is not *what does this
+firmware do* but *which of its known vulnerabilities can an attacker actually
+reach*.
+
+**Why it matters:** a composition scanner already lists CVEs present in an ECU
+image, and on a real image the list is long enough to be unusable for
+prioritisation. The triage — tracing whether anything from CAN, UDS, DoIP or OTA
+reaches the vulnerable function — is manual, repeated per release, and rarely
+finished. That is a deterministic binary-analysis problem, not a language-model
+problem.
+
+**Decision affected:** the product identity, the architecture of record, and the
+roadmap. Legacy ECU recovery becomes a secondary use case. Four boxes of the new
+architecture already exist and are preserved rather than rewritten: intake,
+binary analysis, the sidecar, and the evidence layer.
+
+**Confidence:** the engineering claim is well supported — reachability from a
+source to a sink over a CFG with data flow is a studied problem with known
+limits, and those limits are exactly why `INCONCLUSIVE` is a first-class verdict.
+The market claim is **unvalidated**: no automotive security team has yet been
+interviewed under this framing, and no evidence of demand exists.
+
+**Unresolved uncertainty:** whether teams will act on `INCONCLUSIVE`, or treat it
+as noise. An engine that is honest about not knowing is only valuable if the
+honesty is used.
+
+**Next falsifiable test:** the discovery question in `PROJECT.md` — *show me the
+last firmware release where you had a CVE list and had to decide, by hand, which
+entries actually mattered* — asked of real automotive security teams, measuring
+what consumed the time and what they did when they could not tell.
+

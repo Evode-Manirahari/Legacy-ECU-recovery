@@ -6,7 +6,7 @@
 - ground-truth source that must remain hidden from the investigator;
 - reverse-engineering results and engineer annotations;
 - local workstation, credentials, network, and connected devices;
-- integrity of evidence, confidence scores, and reports.
+- integrity of evidence, verdicts, and Evidence Packs.
 
 ## Trust boundaries
 
@@ -15,6 +15,23 @@ adversarial bytes and therefore require process isolation and resource limits.
 AI model output is untrusted interpretation. MCP, if later introduced, is a
 capability boundary and must expose only enumerated analysis operations. Reports
 are research artifacts, not deployment approval.
+
+## What this system does not do
+
+Stated here because a security tool that is vague about its own limits invites
+the reader to assume more. The system reads firmware and reports reachability
+with evidence. It does **not**:
+
+- generate, weaponise, or execute exploits;
+- flash, modify, or control vehicles or hardware;
+- certify or guarantee regulatory compliance;
+- reconstruct source code or produce replacement firmware;
+- decompile an ECU with a language model.
+
+A `NOT_REACHABLE` verdict is an analysis result, not a safety certification, and
+an Evidence Pack is not deployment approval. Optional verification observes
+whether a path is exercised; it does not develop an exploit and does not run
+against a vehicle.
 
 ## Allowed inputs
 
