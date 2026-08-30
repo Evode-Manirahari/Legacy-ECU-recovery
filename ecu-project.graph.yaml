@@ -665,6 +665,83 @@ nodes:
     # its ownership. Five files changed, none outside the allowed paths.
     note: Verified after PR #45; a status over zero checks is not a status.
 
+  REPOSITION-001:
+    title: Reachability positioning and system architecture of record
+    # The product question changed, and the documentation still answers the old
+    # one. This node makes the repository describe the system actually being
+    # built, and records the architecture as a source of truth that later
+    # implementation must map back to.
+    #
+    # New product statement:
+    #
+    #   A tool that tells automotive security teams which vulnerabilities in
+    #   their ECU firmware are actually reachable, not just present.
+    #
+    # The engineering principle that governs every component boundary below:
+    #
+    #   The model can suggest. The analysis engine decides. The evidence proves.
+    #
+    # This is a DOCUMENTATION node. It writes no code, and that separation is
+    # the point rather than a scoping convenience: a system design that arrives
+    # through an implementation diff is a design nobody reviewed. Architecture
+    # is written first, and the component contracts it produces are what a later
+    # implementation node is measured against.
+    depends_on:
+      # The static pipeline, proven end to end. Three boxes of the architecture
+      # of record - intake, binary analysis, and the evidence the pack is built
+      # from - are described here as things that already exist, and this is the
+      # node that showed they cooperate.
+      - INTEGRATION-STATIC-001
+      # The sidecar. The architecture's sharpest boundary is that the model may
+      # never decide reachability, and describing that boundary honestly
+      # requires the bounded investigator to exist rather than be planned.
+      - AGENT-001
+    # SPEC-001 and GRAPH-001 own most of the documents rewritten here, and both
+    # are already transitive through these two edges, so direct edges would be
+    # redundant - the same reason TOOLS-001 names only EVAL-STATIC-001. The
+    # ordering they provide is what makes the shared ownership safe; it is not
+    # weakened by arriving transitively.
+    #
+    # These two edges also place the node correctly in time. Depending on
+    # SPEC-001 directly would have said this repositioning could have happened
+    # as soon as the spec was written. It could not: it describes a system
+    # informed by everything built since, and the graph's own fan-out tests said
+    # so when the earlier edges were tried.
+    status: PENDING
+    worker: coding-agent
+    prompt: prompts/REPOSITION-001.md
+    # Documentation only. Every path here is prose or a diagram.
+    #
+    # Deliberately NOT authorized: src/**, tests/**, samples/**, artifacts/**.
+    # No component may be built under this node, and no existing behaviour may
+    # be changed to match the new description. Where the documentation and the
+    # code now disagree, the node records the gap as unbuilt rather than
+    # quietly closing it.
+    allowed_paths:
+      - README.md
+      - PROJECT.md
+      - ARCHITECTURE.md
+      - THREAT_MODEL.md
+      - EVALS.md
+      - RESEARCH.md
+      - DECISIONS.md
+      - docs/MASTER_SPEC.md
+      # The architecture of record: the diagram plus one contract per component
+      # in it. `docs/architecture.md` predates this directory and is folded into
+      # it, leaving a pointer rather than a second answer.
+      - docs/architecture/**
+      - docs/architecture.md
+      - TODO.md
+    verification:
+      type: commands
+      commands:
+        # Nothing here should be able to change behaviour. A green suite is
+        # evidence that it did not.
+        - uv run --frozen pytest
+        - git diff --exit-code uv.lock
+    retry_budget: 2
+    note: Architecture first, in writing. No component is built under this node.
+
   BASELINE-PREFLIGHT-001:
     title: Local transport readiness before the baseline spends
     # A repair node, opened after the pre-spend checklist reproduced a defect of
