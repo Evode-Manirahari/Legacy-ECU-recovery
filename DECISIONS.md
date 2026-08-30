@@ -292,3 +292,54 @@ laboratory's `.stripped` and `.symbols`. The previous three-extension list
 rejected this project's own investigator-visible artifact. The extension check is
 a guard against selecting the wrong file, not a security control; extension-free
 raw dumps are a known gap recorded in `TODO.md`.
+
+## ADR-005 — Reposition as an Automotive Firmware Reachability Engine
+
+**Date:** 2026-08-29
+**Status:** accepted
+
+### Context
+
+The repository described an evidence-first investigation system for undocumented
+firmware: `binary -> understanding -> reconstruction -> behavioral validation`.
+That capability is real and mostly built. It was not a product question anybody
+was asking with a budget attached.
+
+The question that is: **which of the known vulnerabilities in this ECU image can
+an attacker actually reach?** A composition scanner answers presence. Presence is
+a lookup; reachability is an analysis, and it either has a path or it does not.
+
+### Decision
+
+The product is an Automotive Firmware Reachability Engine. Legacy ECU recovery
+becomes a documented secondary use case rather than the identity.
+
+`docs/architecture/` becomes the system design of record - the diagram plus nine
+component contracts, each answering position, responsibility, inputs, outputs,
+permitted dependencies, and testing, in that fixed order. Architecture is
+documented before or alongside implementation.
+
+Four constraints are architectural rather than stylistic:
+
+1. The LLM is a sidecar and never decides a verdict. Removing every model
+   annotation must not change a verdict, which is the testable form of the claim.
+2. Verdicts are exactly `REACHABLE`, `NOT_REACHABLE`, `INCONCLUSIVE`, and the
+   engine prefers `INCONCLUSIVE` to an unjustified `NOT_REACHABLE`.
+3. No confidence percentage on a verdict.
+4. Verification is optional and off the critical path.
+
+### Consequences
+
+Five of the nine components do not exist and each needs its own node. Intake,
+binary analysis, the sidecar and the evidence layer are preserved and reframed
+rather than rewritten; data-flow analysis is the missing prerequisite for the two
+components above it.
+
+The package name `ecu_recovery` and the repository name `Legacy-ECU-recovery` are
+kept for now. Renaming touches every import across work already verified - a
+large diff to change a string - and the names are recorded as historical rather
+than as a statement of scope.
+
+A false-unreachable becomes a release blocker in the benchmark, which is a
+stronger obligation than any metric the project previously carried.
+

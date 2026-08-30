@@ -7,6 +7,49 @@ good” is not an acceptance criterion.
 The project is successful only when it produces repeatable, evidence-backed
 results against ground truth and saves expert time.
 
+## Reachability benchmark
+
+The reachability engine is benchmarked on **every meaningful change**. This is CI
+and development infrastructure: it does not appear in the runtime architecture
+and no production component may depend on it.
+
+| Metric | Measures | Obligation |
+|---|---|---|
+| Reachable-path recall | Of genuinely reachable pairs, how many were found | tracked, target set per release |
+| **False-unreachable rate** | Genuinely reachable pairs classified `NOT_REACHABLE` | **release blocker** |
+| False-reachable rate | Paths claimed that do not exist | tracked |
+| Inconclusive rate | Pairs the engine could not decide | tracked |
+| Attack-surface identification | Recall and precision of automotive sources, per protocol class | tracked |
+| Vulnerable-sink mapping | Recall and precision of CVE-to-sink location | tracked |
+| Analysis runtime | Wall-clock per image | tracked |
+
+### The false-unreachable release blocker
+
+**A confirmed false-unreachable blocks release.** One is enough.
+
+The three verdicts do not have symmetrical costs. A wrong `REACHABLE` wastes
+engineering time and gets discovered by whoever investigates it. An
+`INCONCLUSIVE` is honest about work remaining. A wrong `NOT_REACHABLE` tells a
+security team that a live, exploitable defect is safe to deprioritise, and
+nothing downstream is looking for it. It is the only error whose cost is paid
+entirely by somebody who trusted the answer.
+
+**This threshold is not to be relaxed to make a suite pass.** If a change
+introduces a false-unreachable, the change is wrong or the analysis is
+incomplete; either way the engine should have returned `INCONCLUSIVE`. Lowering
+the bar converts a caught defect into a shipped one.
+
+The inconclusive rate is tracked alongside it for the obvious reason: an engine
+that answers `INCONCLUSIVE` to everything has a perfect false-unreachable rate
+and no value. The pair has to be read together.
+
+### Sidecar independence
+
+A structural check rather than a metric, run over the same corpus: with every
+sidecar annotation removed, verdicts must be **byte-identical**. This is the
+testable form of "the model never decides", and it is the benchmark's most
+load-bearing assertion about the architecture.
+
 ## Verification hierarchy
 
 Use the highest level that can decide the property.

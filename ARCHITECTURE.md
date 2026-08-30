@@ -1,8 +1,35 @@
-# Architecture
+# Architecture — what exists
 
-This document describes only what exists in the repository today, plus what is
-explicitly planned by an assigned node. Speculative components do not belong
+**This document describes only what exists in the repository today**, plus what
+is explicitly planned by an assigned node. Speculative components do not belong
 here.
+
+For the *target* system design — the diagram and the nine component contracts —
+see **[docs/architecture/](docs/architecture/)**, which is the source of truth.
+The two documents answer different questions on purpose: that one says what the
+system is, this one says how much of it is built.
+
+## Where today's code sits in the target architecture
+
+| Architecture box | Status | Modules |
+|---|---|---|
+| Intake | **Built** | `intake.py`, `binary/`, `models.py` |
+| Binary analysis | **Built for CFG-level facts** | `analysis/`, `ghidra/` — functions, call graph, xrefs, decompilation. **Data-flow analysis is not built** |
+| LLM sidecar | **Built** | `agent/`, `providers/openai/`, `evaluation/agent/` |
+| Evidence pack | **Foundations built** | `evidence/schema.py`, `reports/`, `report.py` |
+| Components, CVEs → vulnerable sinks | **Not built** | — |
+| Attack surface → automotive sources | **Not built** | — |
+| Reachability engine | **Not built** | — |
+| Verdict | **Not built** | — |
+| Verification | **Not built** | — |
+
+Five of the nine components do not exist. Each requires its own node, its own
+authorization, and its own evidence; none of them is closed by documentation.
+
+The tool layer (`tools/`) and the evaluation stack (`evaluation/`) do not appear
+in the target diagram. The tool layer is the bounded fact surface the sidecar
+reads through; the evaluation stack is development and CI infrastructure and is
+deliberately outside the runtime architecture.
 
 ## Status note (2026-08-17)
 
@@ -171,6 +198,14 @@ These are stated here because this document must not overstate what exists.
 | CI coverage | CI runs on Linux only, so the x86-64 Mach-O fixture tests never execute there. Covering them needs an x86-64 macOS runner or a portable fixture target — a `DATA-001` decision. |
 
 ## Components that do not exist
+
+Against the target architecture, in the order they appear in the diagram:
+CVE-to-sink mapping, attack-surface identification, the reachability engine, the
+verdict type, and verification. Data-flow analysis is missing from the otherwise
+built binary-analysis component, and it is a prerequisite for the two components
+above it.
+
+Historically, against the earlier positioning:
 
 No agent tool layer, MCP server, AI model integration, autonomous loop, emulator,
 peripheral model, experiment engine, reconstruction pipeline, real ECU fixture,
